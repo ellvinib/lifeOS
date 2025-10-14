@@ -1,0 +1,88 @@
+/**
+ * Standardized error codes for the application.
+ * Using enum for type safety and easy reference.
+ */
+export enum ErrorCode {
+  // General errors (1000-1999)
+  INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+
+  // Validation errors (2000-2999)
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
+  INVALID_INPUT = 'INVALID_INPUT',
+  REQUIRED_FIELD_MISSING = 'REQUIRED_FIELD_MISSING',
+
+  // Resource errors (3000-3999)
+  NOT_FOUND = 'NOT_FOUND',
+  ALREADY_EXISTS = 'ALREADY_EXISTS',
+  CONFLICT = 'CONFLICT',
+
+  // Authorization errors (4000-4999)
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  FORBIDDEN = 'FORBIDDEN',
+  PERMISSION_DENIED = 'PERMISSION_DENIED',
+
+  // Business logic errors (5000-5999)
+  BUSINESS_RULE_VIOLATION = 'BUSINESS_RULE_VIOLATION',
+  INVALID_STATE_TRANSITION = 'INVALID_STATE_TRANSITION',
+  OPERATION_NOT_ALLOWED = 'OPERATION_NOT_ALLOWED',
+
+  // Module errors (6000-6999)
+  MODULE_NOT_FOUND = 'MODULE_NOT_FOUND',
+  MODULE_INITIALIZATION_FAILED = 'MODULE_INITIALIZATION_FAILED',
+  MODULE_DEPENDENCY_MISSING = 'MODULE_DEPENDENCY_MISSING',
+
+  // Event errors (7000-7999)
+  EVENT_HANDLER_FAILED = 'EVENT_HANDLER_FAILED',
+  EVENT_PUBLISH_FAILED = 'EVENT_PUBLISH_FAILED',
+
+  // Database errors (8000-8999)
+  DATABASE_ERROR = 'DATABASE_ERROR',
+  QUERY_FAILED = 'QUERY_FAILED',
+  CONNECTION_FAILED = 'CONNECTION_FAILED',
+  TRANSACTION_FAILED = 'TRANSACTION_FAILED',
+}
+
+/**
+ * Map error codes to HTTP status codes
+ */
+export const ErrorCodeToHttpStatus: Record<ErrorCode, number> = {
+  // General errors
+  [ErrorCode.INTERNAL_SERVER_ERROR]: 500,
+  [ErrorCode.UNKNOWN_ERROR]: 500,
+
+  // Validation errors
+  [ErrorCode.VALIDATION_ERROR]: 400,
+  [ErrorCode.INVALID_INPUT]: 400,
+  [ErrorCode.REQUIRED_FIELD_MISSING]: 400,
+
+  // Resource errors
+  [ErrorCode.NOT_FOUND]: 404,
+  [ErrorCode.ALREADY_EXISTS]: 409,
+  [ErrorCode.CONFLICT]: 409,
+
+  // Authorization errors
+  [ErrorCode.UNAUTHORIZED]: 401,
+  [ErrorCode.FORBIDDEN]: 403,
+  [ErrorCode.PERMISSION_DENIED]: 403,
+
+  // Business logic errors
+  [ErrorCode.BUSINESS_RULE_VIOLATION]: 422,
+  [ErrorCode.INVALID_STATE_TRANSITION]: 422,
+  [ErrorCode.OPERATION_NOT_ALLOWED]: 422,
+
+  // Module errors
+  [ErrorCode.MODULE_NOT_FOUND]: 500,
+  [ErrorCode.MODULE_INITIALIZATION_FAILED]: 500,
+  [ErrorCode.MODULE_DEPENDENCY_MISSING]: 500,
+
+  // Event errors
+  [ErrorCode.EVENT_HANDLER_FAILED]: 500,
+  [ErrorCode.EVENT_PUBLISH_FAILED]: 500,
+
+  // Database errors
+  [ErrorCode.DATABASE_ERROR]: 500,
+  [ErrorCode.QUERY_FAILED]: 500,
+  [ErrorCode.CONNECTION_FAILED]: 503,
+  [ErrorCode.TRANSACTION_FAILED]: 500,
+};

@@ -1,0 +1,292 @@
+// Prisma Schema for LifeOS
+// Following clean architecture - this is infrastructure, not domain
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Core Tables (shared across all modules)
+// ============================================================================
+
+/// Universal task entity that all modules extend
+/// Module-specific data is stored in metadata JSON field
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @default("")
+  type        String   // e.g., "mowing", "payment", "maintenance"
+  status      String   // "pending", "in_progress", "completed", "cancelled"
+  priority    String   // "low", "medium", "high", "urgent"
+
+  // Dates
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Recurrence (stored as JSON)
+  recurrence  Json?
+
+  // Module tracking
+  moduleSource String  // Which module created this task
+
+  // Module-specific data (flexible JSONB storage)
+  metadata    Json     @default("{}")
+
+  // Tags
+  tags        String[] @default([])
+
+  // Indexes for performance
+  @@index([moduleSource])
+  @@index([status])
+  @@index([dueDate])
+  @@index([priority])
+  @@map("tasks")
+}
+
+/// Event store for event sourcing
+/// Provides complete audit trail of all domain events
+model Event {
+  id        String   @id @default(uuid())
+  type      String   // Event type (e.g., "TaskCreated")
+  source    String   // Module that published the event
+  timestamp DateTime @default(now())
+  payload   Json     // Event data
+  metadata  Json     @default("{}")
+  version   Int      @default(1)
+
+  // Indexes for querying
+  @@index([type])
+  @@index([source])
+  @@index([timestamp])
+  @@map("events")
+}
+
+/// Module registry for tracking installed modules
+model Module {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  version     String
+  enabled     Boolean  @default(true)
+  config      Json     @default("{}")
+  installedAt DateTime @default(now())
+
+  @@map("modules")
+}
+
+/// User management (basic for now)
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String   // Hashed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ============================================================================
+// Module-Specific Tables
+// These are examples - each module will add its own tables via migrations
+// ============================================================================
+
+// Garden Module Tables
+model GardenPlant {
+  id                 String        @id @default(uuid())
+  name               String
+  scientificName     String?
+  type               String        // PlantType enum as string
+  variety            String?
+  location           String
+  areaId             String?
+  area               GardenArea?   @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  plantedDate        DateTime
+  growthStage        String        // GrowthStage enum as string
+  sunExposure        String        // SunExposure enum as string
+  wateringFrequency  String        // WateringFrequency enum as string
+  lastWatered        DateTime?
+  lastFertilized     DateTime?
+  lastPruned         DateTime?
+  notes              String        @default("")
+  imageUrl           String?
+  isActive           Boolean       @default(true)
+  harvestDate        DateTime?
+  expectedHarvestDate DateTime?
+  metadata           Json          @default("{}")
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([areaId])
+  @@index([type])
+  @@index([growthStage])
+  @@index([isActive])
+  @@map("garden_plants")
+}
+
+model GardenArea {
+  id                      String        @id @default(uuid())
+  name                    String
+  type                    String        // GardenAreaType enum as string
+  description             String?
+  sizeSquareMeters        Float?
+  location                String
+  soilType                String?
+  sunExposureHours        Float?
+  irrigationSystem        String?
+  lastMaintained          DateTime?
+  maintenanceFrequencyDays Int?
+  isActive                Boolean       @default(true)
+  notes                   String        @default("")
+  imageUrl                String?
+  metadata                Json          @default("{}")
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  plants                  GardenPlant[]
+  gardenTasks             GardenTask[]  @relation("AreaTasks")
+
+  @@index([type])
+  @@index([isActive])
+  @@map("garden_areas")
+}
+
+model GardenTask {
+  id                      String        @id @default(uuid())
+  title                   String
+  description             String?
+  type                    String        // GardenTaskType enum as string
+  status                  String        // TaskStatus enum as string
+  priority                String        // TaskPriority enum as string
+  areaId                  String?
+  area                    GardenArea?   @relation("AreaTasks", fields: [areaId], references: [id], onDelete: SetNull)
+  plantIds                String[]      @default([]) // Array of plant IDs
+  estimatedDurationMinutes Int?
+  weatherDependency       String        // WeatherDependency enum as string
+  idealSeasons            String[]      @default([]) // Season enum array as strings
+  dueDate                 DateTime?
+  scheduledDate           DateTime?
+  completedDate           DateTime?
+  notes                   String?
+  tools                   String[]      @default([])
+  materials               String[]      @default([])
+  cost                    Float?
+  isRecurring             Boolean       @default(false)
+  recurrenceIntervalDays  Int?
+  nextRecurrenceDate      DateTime?
+  tags                    String[]      @default([])
+  metadata                Json          @default("{}")
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  @@index([areaId])
+  @@index([type])
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+  @@index([isRecurring])
+  @@map("garden_tasks")
+}
+
+// House Maintenance Module Tables
+model MaintenanceSystem {
+  id                 String    @id @default(uuid())
+  name               String
+  type               String    // "heating", "cooling", "water", etc.
+  location           String?
+  installationDate   DateTime?
+  manufacturer       String?
+  model              String?
+  warrantyExpiration DateTime?
+  manualUrl          String?
+  lastServiced       DateTime?
+  serviceInterval    Json?     // Stored as RecurrencePattern JSON
+  status             String    @default("operational")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  parts Part[]
+
+  @@map("maintenance_systems")
+}
+
+model Part {
+  id                 String             @id @default(uuid())
+  name               String
+  systemId           String?
+  system             MaintenanceSystem? @relation(fields: [systemId], references: [id])
+  currentStock       Int                @default(0)
+  minimumStock       Int                @default(0)
+  unit               String             @default("pieces")
+  replacementInterval Json?
+  lastReplaced       DateTime?
+  costPerUnit        Float?
+  currency           String?
+  supplier           String?
+  orderUrl           String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@map("parts")
+}
+
+// Finance Module Tables
+model Payment {
+  id            String        @id @default(uuid())
+  name          String
+  categoryId    String?
+  category      PaymentCategory? @relation(fields: [categoryId], references: [id])
+  amount        Float
+  currency      String        @default("EUR")
+  dueDate       DateTime
+  recurrence    Json?         // Stored as RecurrencePattern JSON
+  paymentMethod String        @default("bank_transfer")
+  provider      String?
+  accountNumber String?       // Encrypted in application layer
+  status        String        @default("pending")
+  autoPayment   Boolean       @default(false)
+  reminderDays  Int           @default(3)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  transactions Transaction[]
+
+  @@map("payments")
+}
+
+model PaymentCategory {
+  id           String    @id @default(uuid())
+  name         String    @unique
+  color        String?
+  icon         String?
+  budgetLimit  Float?
+  currency     String    @default("EUR")
+  parentId     String?
+  parent       PaymentCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children     PaymentCategory[] @relation("CategoryHierarchy")
+  payments     Payment[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("payment_categories")
+}
+
+model Transaction {
+  id                 String    @id @default(uuid())
+  paymentId          String
+  payment            Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount             Float
+  paidDate           DateTime  @default(now())
+  confirmationNumber String?
+  notes              String    @default("")
+  createdAt          DateTime  @default(now())
+
+  @@map("transactions")
+}
