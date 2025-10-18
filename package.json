@@ -19,6 +19,10 @@
     "type-check": "turbo run type-check",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report",
     "clean": "turbo run clean && rm -rf node_modules",
     "db:migrate": "cd packages/api && npm run db:migrate",
     "db:seed": "cd packages/api && npm run db:seed",
@@ -26,6 +30,7 @@
     "docker:down": "docker-compose down"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",

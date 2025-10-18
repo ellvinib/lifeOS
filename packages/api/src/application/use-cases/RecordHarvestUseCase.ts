@@ -11,8 +11,8 @@
  * - Returns Result type: Explicit error handling
  */
 
-import type { IPlantRepository, Plant, EventBus, Result, BaseError } from '@lifeos/core';
-import { BusinessRuleError } from '@lifeos/core';
+import { Result, BusinessRuleError } from '@lifeos/core';
+import type { IPlantRepository, Plant, EventBus, BaseError } from '@lifeos/core';
 
 /**
  * Record Harvest Use Case.

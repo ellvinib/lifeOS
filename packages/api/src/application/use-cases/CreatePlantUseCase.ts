@@ -11,8 +11,8 @@
  * - Returns Result type: Explicit error handling
  */
 
-import type { IPlantRepository, Plant, EventBus, Result, BaseError } from '@lifeos/core';
-import { BusinessRuleError, ValidationError } from '@lifeos/core';
+import { Result, BusinessRuleError, ValidationError } from '@lifeos/core';
+import type { IPlantRepository, Plant, EventBus, BaseError } from '@lifeos/core';
 
 /**
  * Create Plant Use Case.

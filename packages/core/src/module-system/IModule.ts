@@ -1,4 +1,4 @@
-import type { EventHandler } from '../events';
+import type { DomainEvent, EventHandler } from '../events';
 
 /**
  * Module manifest defining module metadata and dependencies.
@@ -138,7 +138,7 @@ export interface ModuleContext {
    * Event bus for pub/sub communication
    */
   eventBus: {
-    publish: (event: unknown) => Promise<void>;
+    publish: <T = unknown>(event: DomainEvent<T>) => Promise<void>;
     subscribe: (
       eventType: string,
       handler: EventHandler,

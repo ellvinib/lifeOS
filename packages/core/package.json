@@ -26,6 +26,8 @@
     "./domain": "./dist/domain/index.js",
     "./events": "./dist/events/index.js",
     "./module-system": "./dist/module-system/index.js",
-    "./shared": "./dist/shared/index.js"
+    "./shared": "./dist/shared/index.js",
+    "./shared/result": "./dist/shared/result/index.js",
+    "./shared/errors": "./dist/shared/errors/index.js"
   }
 }

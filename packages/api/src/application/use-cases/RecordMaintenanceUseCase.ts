@@ -11,8 +11,8 @@
  * - Returns Result type: Explicit error handling
  */
 
-import type { IGardenAreaRepository, GardenArea, EventBus, Result, BaseError } from '@lifeos/core';
-import { BusinessRuleError } from '@lifeos/core';
+import { Result, BusinessRuleError } from '@lifeos/core';
+import type { IGardenAreaRepository, GardenArea, EventBus, BaseError } from '@lifeos/core';
 
 /**
  * Record Maintenance Use Case.

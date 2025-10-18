@@ -1,4 +1,4 @@
-import type { BaseError } from '../errors';
+import { BaseError } from '../errors';
 
 /**
  * Result type for functional error handling.
@@ -227,6 +227,6 @@ export class Result<T, E extends BaseError = BaseError> {
       values.push(result.value);
     }
 
-    return Result.ok(values as T);
+    return Result.ok(values as unknown as T);
   }
 }
