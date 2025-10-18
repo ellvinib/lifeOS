@@ -17,12 +17,12 @@ datasource db {
 /// Universal task entity that all modules extend
 /// Module-specific data is stored in metadata JSON field
 model Task {
-  id          String   @id @default(uuid())
+  id          String @id @default(uuid())
   title       String
-  description String   @default("")
-  type        String   // e.g., "mowing", "payment", "maintenance"
-  status      String   // "pending", "in_progress", "completed", "cancelled"
-  priority    String   // "low", "medium", "high", "urgent"
+  description String @default("")
+  type        String // e.g., "mowing", "payment", "maintenance"
+  status      String // "pending", "in_progress", "completed", "cancelled"
+  priority    String // "low", "medium", "high", "urgent"
 
   // Dates
   dueDate     DateTime?
@@ -31,16 +31,16 @@ model Task {
   updatedAt   DateTime  @updatedAt
 
   // Recurrence (stored as JSON)
-  recurrence  Json?
+  recurrence Json?
 
   // Module tracking
-  moduleSource String  // Which module created this task
+  moduleSource String // Which module created this task
 
   // Module-specific data (flexible JSONB storage)
-  metadata    Json     @default("{}")
+  metadata Json @default("{}")
 
   // Tags
-  tags        String[] @default([])
+  tags String[] @default([])
 
   // Indexes for performance
   @@index([moduleSource])
@@ -54,10 +54,10 @@ model Task {
 /// Provides complete audit trail of all domain events
 model Event {
   id        String   @id @default(uuid())
-  type      String   // Event type (e.g., "TaskCreated")
-  source    String   // Module that published the event
+  type      String // Event type (e.g., "TaskCreated")
+  source    String // Module that published the event
   timestamp DateTime @default(now())
-  payload   Json     // Event data
+  payload   Json // Event data
   metadata  Json     @default("{}")
   version   Int      @default(1)
 
@@ -85,19 +85,19 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   name      String
-  password  String   // Hashed
+  password  String // Hashed
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  bankConnections BankConnection[]
-  categorizationRules CategorizationRule[]
+  bankConnections            BankConnection[]
+  categorizationRules        CategorizationRule[]
   transactionClassifications TransactionClassification[]
-  monthlySummaries MonthlySummary[]
-  categoryTotals CategoryTotal[]
-  importBatches ImportBatch[]
-  expenses FinanceExpense[]
-  budgets FinanceBudget[]
+  monthlySummaries           MonthlySummary[]
+  categoryTotals             CategoryTotal[]
+  importBatches              ImportBatch[]
+  expenses                   FinanceExpense[]
+  budgets                    FinanceBudget[]
 
   @@map("users")
 }
@@ -109,29 +109,29 @@ model User {
 
 // Garden Module Tables
 model GardenPlant {
-  id                 String        @id @default(uuid())
-  name               String
-  scientificName     String?
-  type               String        // PlantType enum as string
-  variety            String?
-  location           String
-  areaId             String?
-  area               GardenArea?   @relation(fields: [areaId], references: [id], onDelete: SetNull)
-  plantedDate        DateTime
-  growthStage        String        // GrowthStage enum as string
-  sunExposure        String        // SunExposure enum as string
-  wateringFrequency  String        // WateringFrequency enum as string
-  lastWatered        DateTime?
-  lastFertilized     DateTime?
-  lastPruned         DateTime?
-  notes              String        @default("")
-  imageUrl           String?
-  isActive           Boolean       @default(true)
-  harvestDate        DateTime?
+  id                  String      @id @default(uuid())
+  name                String
+  scientificName      String?
+  type                String // PlantType enum as string
+  variety             String?
+  location            String
+  areaId              String?
+  area                GardenArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  plantedDate         DateTime
+  growthStage         String // GrowthStage enum as string
+  sunExposure         String // SunExposure enum as string
+  wateringFrequency   String // WateringFrequency enum as string
+  lastWatered         DateTime?
+  lastFertilized      DateTime?
+  lastPruned          DateTime?
+  notes               String      @default("")
+  imageUrl            String?
+  isActive            Boolean     @default(true)
+  harvestDate         DateTime?
   expectedHarvestDate DateTime?
-  metadata           Json          @default("{}")
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  metadata            Json        @default("{}")
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
   @@index([areaId])
   @@index([type])
@@ -141,26 +141,26 @@ model GardenPlant {
 }
 
 model GardenArea {
-  id                      String        @id @default(uuid())
-  name                    String
-  type                    String        // GardenAreaType enum as string
-  description             String?
-  sizeSquareMeters        Float?
-  location                String
-  soilType                String?
-  sunExposureHours        Float?
-  irrigationSystem        String?
-  lastMaintained          DateTime?
+  id                       String    @id @default(uuid())
+  name                     String
+  type                     String // GardenAreaType enum as string
+  description              String?
+  sizeSquareMeters         Float?
+  location                 String
+  soilType                 String?
+  sunExposureHours         Float?
+  irrigationSystem         String?
+  lastMaintained           DateTime?
   maintenanceFrequencyDays Int?
-  isActive                Boolean       @default(true)
-  notes                   String        @default("")
-  imageUrl                String?
-  metadata                Json          @default("{}")
-  createdAt               DateTime      @default(now())
-  updatedAt               DateTime      @updatedAt
+  isActive                 Boolean   @default(true)
+  notes                    String    @default("")
+  imageUrl                 String?
+  metadata                 Json      @default("{}")
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  plants                  GardenPlant[]
-  gardenTasks             GardenTask[]  @relation("AreaTasks")
+  plants      GardenPlant[]
+  gardenTasks GardenTask[]  @relation("AreaTasks")
 
   @@index([type])
   @@index([isActive])
@@ -168,32 +168,32 @@ model GardenArea {
 }
 
 model GardenTask {
-  id                      String        @id @default(uuid())
-  title                   String
-  description             String?
-  type                    String        // GardenTaskType enum as string
-  status                  String        // TaskStatus enum as string
-  priority                String        // TaskPriority enum as string
-  areaId                  String?
-  area                    GardenArea?   @relation("AreaTasks", fields: [areaId], references: [id], onDelete: SetNull)
-  plantIds                String[]      @default([]) // Array of plant IDs
+  id                       String      @id @default(uuid())
+  title                    String
+  description              String?
+  type                     String // GardenTaskType enum as string
+  status                   String // TaskStatus enum as string
+  priority                 String // TaskPriority enum as string
+  areaId                   String?
+  area                     GardenArea? @relation("AreaTasks", fields: [areaId], references: [id], onDelete: SetNull)
+  plantIds                 String[]    @default([]) // Array of plant IDs
   estimatedDurationMinutes Int?
-  weatherDependency       String        // WeatherDependency enum as string
-  idealSeasons            String[]      @default([]) // Season enum array as strings
-  dueDate                 DateTime?
-  scheduledDate           DateTime?
-  completedDate           DateTime?
-  notes                   String?
-  tools                   String[]      @default([])
-  materials               String[]      @default([])
-  cost                    Float?
-  isRecurring             Boolean       @default(false)
-  recurrenceIntervalDays  Int?
-  nextRecurrenceDate      DateTime?
-  tags                    String[]      @default([])
-  metadata                Json          @default("{}")
-  createdAt               DateTime      @default(now())
-  updatedAt               DateTime      @updatedAt
+  weatherDependency        String // WeatherDependency enum as string
+  idealSeasons             String[]    @default([]) // Season enum array as strings
+  dueDate                  DateTime?
+  scheduledDate            DateTime?
+  completedDate            DateTime?
+  notes                    String?
+  tools                    String[]    @default([])
+  materials                String[]    @default([])
+  cost                     Float?
+  isRecurring              Boolean     @default(false)
+  recurrenceIntervalDays   Int?
+  nextRecurrenceDate       DateTime?
+  tags                     String[]    @default([])
+  metadata                 Json        @default("{}")
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
 
   @@index([areaId])
   @@index([type])
@@ -208,7 +208,7 @@ model GardenTask {
 model MaintenanceSystem {
   id                 String    @id @default(uuid())
   name               String
-  type               String    // "heating", "cooling", "water", etc.
+  type               String // "heating", "cooling", "water", etc.
   location           String?
   installationDate   DateTime?
   manufacturer       String?
@@ -216,7 +216,7 @@ model MaintenanceSystem {
   warrantyExpiration DateTime?
   manualUrl          String?
   lastServiced       DateTime?
-  serviceInterval    Json?     // Stored as RecurrencePattern JSON
+  serviceInterval    Json? // Stored as RecurrencePattern JSON
   status             String    @default("operational")
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -227,43 +227,43 @@ model MaintenanceSystem {
 }
 
 model Part {
-  id                 String             @id @default(uuid())
-  name               String
-  systemId           String?
-  system             MaintenanceSystem? @relation(fields: [systemId], references: [id])
-  currentStock       Int                @default(0)
-  minimumStock       Int                @default(0)
-  unit               String             @default("pieces")
+  id                  String             @id @default(uuid())
+  name                String
+  systemId            String?
+  system              MaintenanceSystem? @relation(fields: [systemId], references: [id])
+  currentStock        Int                @default(0)
+  minimumStock        Int                @default(0)
+  unit                String             @default("pieces")
   replacementInterval Json?
-  lastReplaced       DateTime?
-  costPerUnit        Float?
-  currency           String?
-  supplier           String?
-  orderUrl           String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  lastReplaced        DateTime?
+  costPerUnit         Float?
+  currency            String?
+  supplier            String?
+  orderUrl            String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@map("parts")
 }
 
 // Finance Module Tables
 model Payment {
-  id            String        @id @default(uuid())
+  id            String           @id @default(uuid())
   name          String
   categoryId    String?
   category      PaymentCategory? @relation(fields: [categoryId], references: [id])
   amount        Float
-  currency      String        @default("EUR")
+  currency      String           @default("EUR")
   dueDate       DateTime
-  recurrence    Json?         // Stored as RecurrencePattern JSON
-  paymentMethod String        @default("bank_transfer")
+  recurrence    Json? // Stored as RecurrencePattern JSON
+  paymentMethod String           @default("bank_transfer")
   provider      String?
-  accountNumber String?       // Encrypted in application layer
-  status        String        @default("pending")
-  autoPayment   Boolean       @default(false)
-  reminderDays  Int           @default(3)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  accountNumber String? // Encrypted in application layer
+  status        String           @default("pending")
+  autoPayment   Boolean          @default(false)
+  reminderDays  Int              @default(3)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   transactions Transaction[]
 
@@ -271,31 +271,31 @@ model Payment {
 }
 
 model PaymentCategory {
-  id           String    @id @default(uuid())
-  name         String    @unique
-  color        String?
-  icon         String?
-  budgetLimit  Float?
-  currency     String    @default("EUR")
-  parentId     String?
-  parent       PaymentCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children     PaymentCategory[] @relation("CategoryHierarchy")
-  payments     Payment[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String            @id @default(uuid())
+  name        String            @unique
+  color       String?
+  icon        String?
+  budgetLimit Float?
+  currency    String            @default("EUR")
+  parentId    String?
+  parent      PaymentCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    PaymentCategory[] @relation("CategoryHierarchy")
+  payments    Payment[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   @@map("payment_categories")
 }
 
 model Transaction {
-  id                 String    @id @default(uuid())
+  id                 String   @id @default(uuid())
   paymentId          String
-  payment            Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  payment            Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   amount             Float
-  paidDate           DateTime  @default(now())
+  paidDate           DateTime @default(now())
   confirmationNumber String?
-  notes              String    @default("")
-  createdAt          DateTime  @default(now())
+  notes              String   @default("")
+  createdAt          DateTime @default(now())
 
   @@map("transactions")
 }
@@ -306,23 +306,23 @@ model Transaction {
 
 /// Expense tracking with categorization and recurring support
 model FinanceExpense {
-  id                      String    @id @default(uuid())
-  userId                  String
-  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  description             String
-  amount                  Float
-  category                String    // ExpenseCategory enum as string
-  date                    DateTime
-  paymentMethod           String    // PaymentMethod enum as string
-  isRecurring             Boolean   @default(false)
-  recurrenceIntervalDays  Int?
-  merchantName            String?
-  notes                   String?
-  tags                    String[]  @default([])
-  receiptUrl              String?
-  metadata                Json      @default("{}")
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                     String   @id @default(uuid())
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description            String
+  amount                 Float
+  category               String // ExpenseCategory enum as string
+  date                   DateTime
+  paymentMethod          String // PaymentMethod enum as string
+  isRecurring            Boolean  @default(false)
+  recurrenceIntervalDays Int?
+  merchantName           String?
+  notes                  String?
+  tags                   String[] @default([])
+  receiptUrl             String?
+  metadata               Json     @default("{}")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   @@index([userId])
   @@index([category])
@@ -334,24 +334,24 @@ model FinanceExpense {
 
 /// Insurance policy management
 model FinanceInsurance {
-  id                String    @id @default(uuid())
-  type              String    // InsuranceType enum as string
-  provider          String
-  policyNumber      String
-  status            String    // InsuranceStatus enum as string
-  coverageAmount    Float
-  premiumAmount     Float
-  premiumFrequency  String    // PremiumFrequency enum as string
-  startDate         DateTime
-  endDate           DateTime?
-  renewalDate       DateTime?
-  deductible        Float?
-  beneficiaries     String[]  @default([])
-  notes             String?
-  documentUrl       String?
-  metadata          Json      @default("{}")
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id               String    @id @default(uuid())
+  type             String // InsuranceType enum as string
+  provider         String
+  policyNumber     String
+  status           String // InsuranceStatus enum as string
+  coverageAmount   Float
+  premiumAmount    Float
+  premiumFrequency String // PremiumFrequency enum as string
+  startDate        DateTime
+  endDate          DateTime?
+  renewalDate      DateTime?
+  deductible       Float?
+  beneficiaries    String[]  @default([])
+  notes            String?
+  documentUrl      String?
+  metadata         Json      @default("{}")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([type])
   @@index([status])
@@ -363,10 +363,10 @@ model FinanceInsurance {
 /// Loan and mortgage tracking with amortization
 model FinanceLoan {
   id                String    @id @default(uuid())
-  type              String    // LoanType enum as string
+  type              String // LoanType enum as string
   lenderName        String
   accountNumber     String?
-  status            String    // LoanStatus enum as string
+  status            String // LoanStatus enum as string
   principalAmount   Float
   currentBalance    Float
   interestRate      Float
@@ -390,22 +390,22 @@ model FinanceLoan {
 
 /// Bill management with prediction support
 model FinanceBill {
-  id                      String    @id @default(uuid())
-  name                    String
-  type                    String    // BillType enum as string
-  provider                String
-  amount                  Float
-  isPredicted             Boolean   @default(false)
-  predictionConfidence    Float?
-  dueDate                 DateTime
-  status                  String    // BillStatus enum as string
-  isRecurring             Boolean   @default(false)
-  recurrenceIntervalDays  Int?
-  accountNumber           String?
-  notes                   String?
-  metadata                Json      @default("{}")
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                     String   @id @default(uuid())
+  name                   String
+  type                   String // BillType enum as string
+  provider               String
+  amount                 Float
+  isPredicted            Boolean  @default(false)
+  predictionConfidence   Float?
+  dueDate                DateTime
+  status                 String // BillStatus enum as string
+  isRecurring            Boolean  @default(false)
+  recurrenceIntervalDays Int?
+  accountNumber          String?
+  notes                  String?
+  metadata               Json     @default("{}")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   @@index([type])
   @@index([status])
@@ -420,7 +420,7 @@ model FinanceBill {
 model FinanceAsset {
   id            String    @id @default(uuid())
   name          String
-  type          String    // AssetType enum as string
+  type          String // AssetType enum as string
   currentValue  Float
   purchaseValue Float?
   purchaseDate  DateTime?
@@ -438,18 +438,18 @@ model FinanceAsset {
 
 /// Monthly budget planning and tracking
 model FinanceBudget {
-  id           String              @id @default(uuid())
-  userId       String
-  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name         String
-  month        String              // YYYY-MM format
-  totalIncome  Float
-  savingsGoal  Float?
-  metadata     Json                @default("{}")
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  month       String // YYYY-MM format
+  totalIncome Float
+  savingsGoal Float?
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  categories   FinanceBudgetCategory[]
+  categories FinanceBudgetCategory[]
 
   @@unique([userId, month])
   @@index([userId])
@@ -459,14 +459,14 @@ model FinanceBudget {
 
 /// Budget category breakdown
 model FinanceBudgetCategory {
-  id             String         @id @default(uuid())
-  budgetId       String
-  budget         FinanceBudget  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
-  category       String         // ExpenseCategory enum as string
-  plannedAmount  Float
-  spentAmount    Float          @default(0)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id            String        @id @default(uuid())
+  budgetId      String
+  budget        FinanceBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  category      String // ExpenseCategory enum as string
+  plannedAmount Float
+  spentAmount   Float         @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@unique([budgetId, category])
   @@index([budgetId])
@@ -480,18 +480,18 @@ model FinanceBudgetCategory {
 
 /// Bank connection via OAuth2 (Ponto, Isabel Connect)
 model BankConnection {
-  id                            String   @id @default(uuid())
-  userId                        String
-  user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider                      String   // 'ponto' or 'isabel'
-  encryptedAccessToken          String   @db.Text
-  encryptedRefreshToken         String   @db.Text
-  tokenExpiresAt                DateTime
-  accountInformationConsentId   String?
-  status                        String   @default("active") // 'active', 'expired', 'revoked'
-  lastSyncAt                    DateTime?
-  createdAt                     DateTime @default(now())
-  updatedAt                     DateTime @updatedAt
+  id                          String    @id @default(uuid())
+  userId                      String
+  user                        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider                    String // 'ponto' or 'isabel'
+  encryptedAccessToken        String    @db.Text
+  encryptedRefreshToken       String    @db.Text
+  tokenExpiresAt              DateTime
+  accountInformationConsentId String?
+  status                      String    @default("active") // 'active', 'expired', 'revoked'
+  lastSyncAt                  DateTime?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
 
   accounts BankAccount[]
 
@@ -503,20 +503,20 @@ model BankConnection {
 
 /// Bank account linked to connection
 model BankAccount {
-  id                  String         @id @default(uuid())
-  connectionId        String
-  connection          BankConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  externalId          String         // Bank's account ID
-  iban                String?
-  accountHolderName   String?
-  accountName         String?
-  currency            String         @default("EUR")
-  currentBalance      Float?
-  availableBalance    Float?
-  institutionName     String?
-  syncEnabled         Boolean        @default(true)
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  id                String         @id @default(uuid())
+  connectionId      String
+  connection        BankConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  externalId        String // Bank's account ID
+  iban              String?
+  accountHolderName String?
+  accountName       String?
+  currency          String         @default("EUR")
+  currentBalance    Float?
+  availableBalance  Float?
+  institutionName   String?
+  syncEnabled       Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   transactions BankTransaction[]
 
@@ -529,24 +529,25 @@ model BankAccount {
 
 /// Bank transaction from synced account
 model BankTransaction {
-  id                     String       @id @default(uuid())
-  bankAccountId          String
-  bankAccount            BankAccount  @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
-  externalId             String       // Bank's transaction ID
-  amount                 Float
-  currency               String       @default("EUR")
-  description            String       @db.Text
-  counterPartyName       String?
-  counterPartyIban       String?
-  executionDate          DateTime
-  valueDate              DateTime?
-  reconciliationStatus   String       @default("pending") // 'pending', 'matched', 'ignored'
-  reconciledExpenseId    String?      // Link to FinanceExpense
-  suggestedCategory      String?      // Auto-categorization suggestion
-  confidenceScore        Float?       // Categorization confidence (0-1)
-  createdAt              DateTime     @default(now())
+  id                   String      @id @default(uuid())
+  bankAccountId        String
+  bankAccount          BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  externalId           String // Bank's transaction ID
+  amount               Float
+  currency             String      @default("EUR")
+  description          String      @db.Text
+  counterPartyName     String?
+  counterPartyIban     String?
+  executionDate        DateTime
+  valueDate            DateTime?
+  reconciliationStatus String      @default("pending") // 'pending', 'matched', 'ignored'
+  reconciledExpenseId  String? // Link to FinanceExpense
+  suggestedCategory    String? // Auto-categorization suggestion
+  confidenceScore      Float? // Categorization confidence (0-1)
+  createdAt            DateTime    @default(now())
 
   classifications TransactionClassification[]
+  invoiceMatches  FinanceInvoiceTransactionMatch[]
 
   @@unique([bankAccountId, externalId])
   @@index([bankAccountId])
@@ -563,19 +564,19 @@ model BankTransaction {
 
 /// Rule-based categorization rules
 model CategorizationRule {
-  id             String   @id @default(uuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pattern        String   // Pattern to match (merchant name, description, etc.)
-  patternType    String   // 'exact', 'contains', 'regex', 'iban'
-  category       String   // ExpenseCategory
-  confidence     Float    @default(1.0) // Rule confidence (0-1)
-  priority       Int      @default(0)   // Higher priority rules apply first
-  isActive       Boolean  @default(true)
-  source         String   @default("user") // 'user', 'system', 'ml'
-  metadata       Json     @default("{}")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pattern     String // Pattern to match (merchant name, description, etc.)
+  patternType String // 'exact', 'contains', 'regex', 'iban'
+  category    String // ExpenseCategory
+  confidence  Float    @default(1.0) // Rule confidence (0-1)
+  priority    Int      @default(0) // Higher priority rules apply first
+  isActive    Boolean  @default(true)
+  source      String   @default("user") // 'user', 'system', 'ml'
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([userId])
   @@index([category])
@@ -586,16 +587,16 @@ model CategorizationRule {
 
 /// ML training data from user feedback
 model TransactionClassification {
-  id                  String           @id @default(uuid())
-  userId              String
-  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactionId       String
-  transaction         BankTransaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  suggestedCategory   String?          // What the system suggested
-  actualCategory      String           // What the user chose
-  confidence          Float?           // System confidence when suggested
-  feedbackType        String           // 'confirmed', 'corrected', 'rejected'
-  createdAt           DateTime         @default(now())
+  id                String          @id @default(uuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactionId     String
+  transaction       BankTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  suggestedCategory String? // What the system suggested
+  actualCategory    String // What the user chose
+  confidence        Float? // System confidence when suggested
+  feedbackType      String // 'confirmed', 'corrected', 'rejected'
+  createdAt         DateTime        @default(now())
 
   @@index([userId])
   @@index([transactionId])
@@ -610,16 +611,16 @@ model TransactionClassification {
 
 /// Pre-calculated monthly summaries for performance
 model MonthlySummary {
-  id                String   @id @default(uuid())
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  month             String   // YYYY-MM format
-  totalIncome       Float    @default(0)
-  totalExpenses     Float    @default(0)
-  netCashflow       Float    @default(0)
-  transactionCount  Int      @default(0)
-  savingsRate       Float?   // (income - expenses) / income
-  updatedAt         DateTime @updatedAt
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month            String // YYYY-MM format
+  totalIncome      Float    @default(0)
+  totalExpenses    Float    @default(0)
+  netCashflow      Float    @default(0)
+  transactionCount Int      @default(0)
+  savingsRate      Float? // (income - expenses) / income
+  updatedAt        DateTime @updatedAt
 
   @@unique([userId, month])
   @@index([userId])
@@ -629,15 +630,15 @@ model MonthlySummary {
 
 /// Pre-calculated category totals for performance
 model CategoryTotal {
-  id                String   @id @default(uuid())
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category          String   // ExpenseCategory
-  month             String   // YYYY-MM format
-  totalAmount       Float    @default(0)
-  transactionCount  Int      @default(0)
-  averageAmount     Float?
-  updatedAt         DateTime @updatedAt
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category         String // ExpenseCategory
+  month            String // YYYY-MM format
+  totalAmount      Float    @default(0)
+  transactionCount Int      @default(0)
+  averageAmount    Float?
+  updatedAt        DateTime @updatedAt
 
   @@unique([userId, category, month])
   @@index([userId])
@@ -652,21 +653,21 @@ model CategoryTotal {
 
 /// Track manual import batches (CSV, OFX, QFX)
 model ImportBatch {
-  id                  String   @id @default(uuid())
-  userId              String
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fileName            String
-  fileType            String   // 'csv', 'ofx', 'qfx'
-  fileSize            Int      // bytes
-  totalTransactions   Int      @default(0)
-  importedCount       Int      @default(0)
-  duplicateCount      Int      @default(0)
-  errorCount          Int      @default(0)
-  status              String   // 'processing', 'completed', 'failed', 'cancelled'
-  errorDetails        Json?    // Array of error messages
-  metadata            Json     @default("{}")
-  createdAt           DateTime @default(now())
-  completedAt         DateTime?
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName          String
+  fileType          String // 'csv', 'ofx', 'qfx'
+  fileSize          Int // bytes
+  totalTransactions Int       @default(0)
+  importedCount     Int       @default(0)
+  duplicateCount    Int       @default(0)
+  errorCount        Int       @default(0)
+  status            String // 'processing', 'completed', 'failed', 'cancelled'
+  errorDetails      Json? // Array of error messages
+  metadata          Json      @default("{}")
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
 
   @@index([userId])
   @@index([status])
@@ -680,23 +681,23 @@ model ImportBatch {
 
 /// Advertising campaign management
 model AdvertisingCampaign {
-  id                  String                 @id @default(uuid())
-  name                String
-  description         String?
-  platform            String                 // Platform enum as string
-  status              String                 // CampaignStatus enum as string
-  startDate           DateTime
-  endDate             DateTime?
-  totalBudget         Float?
-  currency            String                 @default("EUR")
-  targetAudience      String?
-  objectives          String[]               @default([])
-  tags                String[]               @default([])
-  metadata            Json                   @default("{}")
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
+  id             String    @id @default(uuid())
+  name           String
+  description    String?
+  platform       String // Platform enum as string
+  status         String // CampaignStatus enum as string
+  startDate      DateTime
+  endDate        DateTime?
+  totalBudget    Float?
+  currency       String    @default("EUR")
+  targetAudience String?
+  objectives     String[]  @default([])
+  tags           String[]  @default([])
+  metadata       Json      @default("{}")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  expenses            AdvertisingExpense[]
+  expenses AdvertisingExpense[]
 
   @@index([platform])
   @@index([status])
@@ -707,48 +708,420 @@ model AdvertisingCampaign {
 
 /// Advertising expense tracking with ROI metrics
 model AdvertisingExpense {
-  id                  String                 @id @default(uuid())
-  campaignId          String
-  campaign            AdvertisingCampaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  date                DateTime
-  amount              Float
-  currency            String                 @default("EUR")
-  platform            String                 // Platform enum as string
-  adType              String                 // AdType enum as string
-  description         String?
+  id          String              @id @default(uuid())
+  campaignId  String
+  campaign    AdvertisingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  date        DateTime
+  amount      Float
+  currency    String              @default("EUR")
+  platform    String // Platform enum as string
+  adType      String // AdType enum as string
+  description String?
 
   // Metrics
-  impressions         Int?
-  clicks              Int?
-  conversions         Int?
-  revenue             Float?                 @default(0)
+  impressions Int?
+  clicks      Int?
+  conversions Int?
+  revenue     Float? @default(0)
 
   // Engagement metrics
-  likes               Int?
-  shares              Int?
-  comments            Int?
-  videoViews          Int?
+  likes      Int?
+  shares     Int?
+  comments   Int?
+  videoViews Int?
 
   // Target audience
-  targetAudience      String?
-  ageRange            String?
-  location            String?
+  targetAudience String?
+  ageRange       String?
+  location       String?
 
   // Creative info
-  creativeUrl         String?
-  landingPageUrl      String?
+  creativeUrl    String?
+  landingPageUrl String?
 
   // Notes and metadata
-  notes               String?
-  tags                String[]               @default([])
-  metadata            Json                   @default("{}")
+  notes    String?
+  tags     String[] @default([])
+  metadata Json     @default("{}")
 
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([campaignId])
   @@index([date])
   @@index([platform])
   @@index([adType])
   @@map("advertising_expenses")
+}
+
+// ============================================================================
+// Invoice Management (Invoice-Transaction Reconciliation)
+// ============================================================================
+
+/// Vendor/Supplier management for invoices
+model FinanceVendor {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  vatNumber  String?
+  email      String?
+  phone      String?
+  address    String?
+  city       String?
+  postalCode String?
+  country    String?
+  website    String?
+  vendorType String // VendorType enum as string
+  notes      String?
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  invoices FinanceInvoice[]
+
+  @@index([name])
+  @@index([vendorType])
+  @@index([country])
+  @@index([vatNumber])
+  @@map("finance_vendors")
+}
+
+/// Invoice tracking with AI extraction support
+model FinanceInvoice {
+  id       String         @id @default(uuid())
+  vendorId String?
+  vendor   FinanceVendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  // Invoice details
+  invoiceNumber String?
+  issueDate     DateTime?
+  dueDate       DateTime?
+  paymentDate   DateTime?
+
+  // Amounts
+  subtotal  Float  @default(0)
+  vatAmount Float  @default(0)
+  total     Float  @default(0)
+  currency  String @default("EUR")
+
+  // Status and categorization
+  status   String // InvoiceStatus enum as string
+  category String? // TransactionCategory enum as string
+
+  // File storage
+  pdfPath String // Path to stored PDF file
+
+  // Data extraction
+  source           String // InvoiceSource enum as string
+  extractionStatus String // ExtractionStatus enum as string
+  extractedData    Json? // Extracted data from AI (vendor, line items, etc.)
+
+  // Line items and details
+  lineItems        Json? // Array of InvoiceLineItem
+  paymentReference String? // Payment reference for matching
+
+  // Metadata
+  notes    String?
+  tags     String[] @default([])
+  metadata Json     @default("{}")
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  matches FinanceInvoiceTransactionMatch[]
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([extractionStatus])
+  @@index([source])
+  @@index([category])
+  @@index([issueDate])
+  @@index([dueDate])
+  @@index([invoiceNumber])
+  @@map("finance_invoices")
+}
+
+/// Invoice-Transaction matching for reconciliation
+model FinanceInvoiceTransactionMatch {
+  id String @id @default(uuid())
+
+  // Relationships
+  invoiceId     String
+  invoice       FinanceInvoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  transactionId String
+  transaction   BankTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  // Match details
+  matchConfidence String // MatchConfidence enum as string
+  matchScore      Float // 0-100 score
+  matchedBy       String // 'system' or 'user'
+  matchedByUserId String?
+
+  // Metadata
+  notes    String?
+  metadata Json    @default("{}")
+
+  // Timestamps
+  matchedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@unique([invoiceId, transactionId])
+  @@index([invoiceId])
+  @@index([transactionId])
+  @@index([matchConfidence])
+  @@index([matchedBy])
+  @@index([matchedAt])
+  @@map("finance_invoice_transaction_matches")
+}
+
+// ============================================================================
+// Calendar Module Tables (Phase 1)
+// ============================================================================
+
+/// Calendar provider connection (Google, Outlook, iCloud)
+model CalendarConnection {
+  id                 String @id @default(uuid())
+  userId             String // Foreign key to User
+  provider           String // CalendarProvider enum as string ('google', 'outlook', 'icloud')
+  externalCalendarId String // Provider's calendar ID
+
+  // OAuth credentials (encrypted in application layer)
+  encryptedAccessToken  String    @db.Text
+  encryptedRefreshToken String?   @db.Text
+  tokenExpiresAt        DateTime?
+
+  // Sync status
+  syncStatus     String    @default("idle") // SyncStatus enum as string
+  lastSyncedAt   DateTime?
+  lastSyncError  String?   @db.Text
+  syncErrorCount Int       @default(0)
+
+  // Connection health
+  isActive Boolean @default(true)
+
+  // Metadata
+  calendarName  String?
+  calendarColor String?
+  timeZone      String?
+  metadata      Json    @default("{}")
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  events CalendarEvent[]
+
+  @@unique([userId, provider, externalCalendarId])
+  @@index([userId])
+  @@index([provider])
+  @@index([syncStatus])
+  @@index([isActive])
+  @@index([lastSyncedAt])
+  @@map("calendar_connections")
+}
+
+/// Calendar event with AI scheduling support
+model CalendarEvent {
+  id     String @id @default(uuid())
+  userId String // Foreign key to User
+
+  // External sync info
+  calendarConnectionId String?
+  connection           CalendarConnection? @relation(fields: [calendarConnectionId], references: [id], onDelete: SetNull)
+  externalEventId      String? // Provider's event ID
+
+  // Event details
+  title       String
+  description String? @db.Text
+  location    String?
+
+  // Time slot
+  startTime DateTime
+  endTime   DateTime
+  isAllDay  Boolean  @default(false)
+  timeZone  String   @default("UTC")
+
+  // Flexibility for AI scheduling
+  isFlexible       Boolean @default(false)
+  flexibilityScore Int     @default(0) // 0-100
+  priority         String // Priority enum as string
+  category         String // EventCategory enum as string
+
+  // Module tracking
+  createdByModule String // Module that created this event ('calendar', 'garden', 'finance')
+
+  // Attendees and collaboration
+  attendees      String[] @default([])
+  organizerEmail String?
+
+  // Recurrence
+  isRecurring          Boolean    @default(false)
+  recurrenceRule       String? // iCal RRULE format
+  recurrenceExceptions DateTime[] @default([])
+
+  // Sync status
+  syncStatus   String    @default("idle") // SyncStatus enum as string
+  lastSyncedAt DateTime?
+  syncError    String?
+
+  // Metadata
+  color    String?
+  tags     String[] @default([])
+  metadata Json     @default("{}")
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  schedulingRequests SchedulingRequest[] @relation("ScheduledEvent")
+
+  @@index([userId])
+  @@index([calendarConnectionId])
+  @@index([startTime])
+  @@index([endTime])
+  @@index([isFlexible])
+  @@index([priority])
+  @@index([category])
+  @@index([createdByModule])
+  @@index([syncStatus])
+  @@map("calendar_events")
+}
+
+/// Scheduling request from other modules (Garden, Finance, etc.)
+model SchedulingRequest {
+  id     String @id @default(uuid())
+  userId String // Foreign key to User
+
+  // Request source
+  requestingModule String // Module name ('garden', 'finance', etc.)
+  moduleEntityId   String? // ID of the entity in the requesting module (e.g., garden task ID)
+
+  // Event details
+  title       String
+  description String? @db.Text
+
+  // Time preferences
+  desiredStartTime DateTime?
+  desiredEndTime   DateTime?
+  requiredDuration Int // Duration in minutes
+
+  // Scheduling parameters
+  flexibilityScore Int // 0-100
+  priority         String // Priority enum as string
+  category         String // EventCategory enum as string
+
+  // Optional constraints
+  preferredTimeSlots Json? // Array of preferred time ranges
+  blackoutPeriods    Json? // Array of periods to avoid
+
+  // Request status
+  status           String         @default("pending") // RequestStatus enum as string
+  scheduledEventId String?
+  scheduledEvent   CalendarEvent? @relation("ScheduledEvent", fields: [scheduledEventId], references: [id], onDelete: SetNull)
+
+  // Rejection details
+  rejectionReason String? @db.Text
+
+  // Metadata
+  metadata Json @default("{}")
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([requestingModule])
+  @@index([status])
+  @@index([scheduledEventId])
+  @@index([priority])
+  @@map("scheduling_requests")
+}
+
+// ============================================================================
+// Email Integration Module Tables
+// ============================================================================
+
+/// Email account connections (Gmail, Outlook, SMTP)
+model EmailAccount {
+  id                   String        @id @default(uuid())
+  userId               String
+  provider             EmailProvider
+  email                String
+  emailName            String?
+  isActive             Boolean       @default(true)
+  lastSyncedAt         DateTime?
+
+  // Provider-specific data stored as JSON
+  // Gmail: { historyId, watchExpiration }
+  // Outlook: { subscriptionId, subscriptionExpiration, webhookSecret }
+  // SMTP: { imapHost, imapPort, smtpHost, smtpPort }
+  providerData         Json          @default("{}")
+
+  // Encrypted OAuth tokens or SMTP credentials
+  encryptedCredentials String        @db.Text
+
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // Relations
+  emails               Email[]
+
+  @@unique([userId, email])
+  @@index([userId])
+  @@index([provider])
+  @@index([isActive])
+  @@map("email_accounts")
+}
+
+/// Email metadata (lightweight storage for filtering)
+/// Full email content fetched on-demand from provider
+model Email {
+  id                  String        @id @default(uuid())
+  accountId           String
+  account             EmailAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Provider message ID for lazy loading full content
+  providerMessageId   String
+  provider            EmailProvider
+
+  // Email metadata (for filtering without fetching full content)
+  from                String
+  fromName            String?
+  to                  String[]      @default([])
+  cc                  String[]      @default([])
+  subject             String
+  snippet             String        @db.Text // First ~200 chars
+
+  // Flags and metadata
+  hasAttachments      Boolean       @default(false)
+  attachmentCount     Int           @default(0)
+  labels              String[]      @default([])
+  isRead              Boolean       @default(false)
+  isStarred           Boolean       @default(false)
+
+  // Threading
+  threadId            String?
+
+  // Timestamps
+  timestamp           DateTime      // When email was sent/received
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@unique([accountId, providerMessageId])
+  @@index([accountId])
+  @@index([providerMessageId])
+  @@index([timestamp])
+  @@index([from])
+  @@index([subject])
+  @@map("emails")
+}
+
+/// Email provider types
+enum EmailProvider {
+  GMAIL
+  OUTLOOK
+  SMTP
 }

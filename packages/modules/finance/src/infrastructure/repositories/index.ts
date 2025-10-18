@@ -7,3 +7,5 @@ export * from './CategorizationRuleRepository';
 export * from './TransactionClassificationRepository';
 export * from './MonthlySummaryRepository';
 export * from './CategoryTotalRepository';
+export * from './AdvertisingCampaignRepository';
+export * from './AdvertisingExpenseRepository';

@@ -7,3 +7,6 @@ export * from './Budget';
 export * from './BankConnection';
 export * from './BankAccount';
 export * from './BankTransaction';
+export * from './Invoice';
+export * from './Vendor';
+export * from './InvoiceTransactionMatch';

@@ -1,2 +1,1 @@
-export * from './EncryptionService';
-export * from './IbanityApiService';
+export * from './GeminiFlashService';

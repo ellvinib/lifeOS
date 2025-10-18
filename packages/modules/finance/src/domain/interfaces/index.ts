@@ -9,3 +9,7 @@ export * from './IBankAccountRepository';
 export * from './IBankTransactionRepository';
 export * from './IIbanityService';
 export * from './IEncryptionService';
+export * from './IInvoiceRepository';
+export * from './IVendorRepository';
+export * from './IInvoiceTransactionMatchRepository';
+export * from './IFileStorage';
