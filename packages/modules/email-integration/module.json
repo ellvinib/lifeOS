@@ -1,0 +1,136 @@
+{
+  "name": "email-integration",
+  "version": "1.0.0",
+  "description": "Shared email integration module for LifeOS - Supports Outlook, Gmail, and SMTP providers with event-driven architecture",
+  "author": "LifeOS Team",
+  "type": "infrastructure",
+  "enabled": true,
+  "permissions": [
+    "network.access",
+    "database.read",
+    "database.write",
+    "events.publish",
+    "cache.read",
+    "cache.write",
+    "queue.read",
+    "queue.write"
+  ],
+  "dependencies": {
+    "core": "^1.0.0"
+  },
+  "events": {
+    "publishes": [
+      "EmailReceived",
+      "EmailAccountConnected",
+      "EmailAccountDisconnected",
+      "EmailSyncCompleted",
+      "EmailSyncFailed"
+    ],
+    "subscribes": []
+  },
+  "providers": [
+    {
+      "name": "outlook",
+      "display": "Microsoft Outlook / Office 365",
+      "type": "oauth",
+      "authUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      "scopes": ["Mail.Read", "Mail.ReadWrite"],
+      "webhookSupport": true
+    },
+    {
+      "name": "gmail",
+      "display": "Gmail",
+      "type": "oauth",
+      "authUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+      "tokenUrl": "https://oauth2.googleapis.com/token",
+      "scopes": ["https://www.googleapis.com/auth/gmail.readonly"],
+      "webhookSupport": true
+    },
+    {
+      "name": "smtp",
+      "display": "SMTP/IMAP",
+      "type": "credentials",
+      "webhookSupport": false,
+      "pollingInterval": 300000
+    }
+  ],
+  "endpoints": {
+    "webhooks": [
+      {
+        "path": "/api/email/webhooks/outlook",
+        "method": "POST",
+        "provider": "outlook",
+        "description": "Microsoft Graph webhook endpoint"
+      },
+      {
+        "path": "/api/email/webhooks/gmail",
+        "method": "POST",
+        "provider": "gmail",
+        "description": "Gmail Pub/Sub webhook endpoint"
+      }
+    ],
+    "api": [
+      {
+        "path": "/api/email/accounts/connect",
+        "method": "POST",
+        "description": "Connect new email account"
+      },
+      {
+        "path": "/api/email/accounts",
+        "method": "GET",
+        "description": "List connected accounts"
+      },
+      {
+        "path": "/api/email/accounts/:id",
+        "method": "DELETE",
+        "description": "Disconnect account"
+      }
+    ]
+  },
+  "jobs": [
+    {
+      "name": "subscription-renewal",
+      "schedule": "0 0 * * *",
+      "description": "Renew webhook subscriptions daily"
+    },
+    {
+      "name": "email-sync",
+      "type": "queue",
+      "queue": "email-sync",
+      "concurrency": 5,
+      "description": "Process email sync jobs"
+    }
+  ],
+  "storage": {
+    "tables": [
+      "EmailAccount",
+      "Email"
+    ],
+    "cacheKeys": [
+      "email:{accountId}:{providerMessageId}"
+    ],
+    "queues": [
+      "email-sync"
+    ]
+  },
+  "configuration": {
+    "env": [
+      "MICROSOFT_CLIENT_ID",
+      "MICROSOFT_CLIENT_SECRET",
+      "MICROSOFT_REDIRECT_URI",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "GOOGLE_REDIRECT_URI",
+      "WEBHOOK_BASE_URL",
+      "REDIS_URL"
+    ]
+  },
+  "architecture": {
+    "pattern": "clean-architecture",
+    "layers": ["domain", "application", "infrastructure", "presentation"],
+    "eventDriven": true,
+    "lazyLoading": true,
+    "backgroundJobs": true
+  }
+}

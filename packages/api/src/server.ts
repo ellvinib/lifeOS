@@ -67,7 +67,8 @@ function createApp(): express.Application {
       modules: {
         tasks: `http://localhost:${port}/api/tasks`,
         garden: `http://localhost:${port}/api/garden`,
-        finance: `http://localhost:${port}/api/finance`,
+        // finance: `http://localhost:${port}/api/finance`, // Temporarily disabled - missing dependencies
+        calendar: `http://localhost:${port}/api/calendar/events`,
         auth: `http://localhost:${port}/api/auth`,
       },
       documentation: 'https://github.com/yourusername/lifeOS',
@@ -114,9 +115,14 @@ function createApp(): express.Application {
   ));
 
   // Finance module routes (full implementation)
-  const { createFinanceRoutes } = require('../../modules/finance/src/presentation/routes');
+  // TODO: Fix finance module dependencies (csv-parse, multer) before uncommenting
+  // const { createFinanceRoutes } = require('../../modules/finance/src/presentation/routes');
+  // app.use('/api/finance', createFinanceRoutes(prisma, eventBus));
+
+  // Calendar module routes
   const prisma = DatabaseClient.getInstance();
-  app.use('/api/finance', createFinanceRoutes(prisma, eventBus));
+  const { createCalendarEventRoutes } = require('../../modules/calendar/src/presentation/routes');
+  app.use('/api/calendar/events', createCalendarEventRoutes(prisma, eventBus));
 
   // Authentication routes
   const { createAuthRoutes } = require('./presentation/routes/auth.routes');

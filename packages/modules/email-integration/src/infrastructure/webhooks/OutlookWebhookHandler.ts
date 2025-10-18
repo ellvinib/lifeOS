@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { EmailAccount } from '../../domain/entities/EmailAccount';
+import { EmailSyncQueue } from '../queues/EmailSyncQueue';
 
 /**
  * Microsoft Graph Notification Format
@@ -33,23 +34,21 @@ interface GraphWebhookPayload {
  * - Validate Microsoft's webhook verification request
  * - Verify clientState secret for security
  * - Extract message IDs from notifications
- * - Trigger email sync for affected accounts
+ * - Add sync jobs to queue (non-blocking)
  *
  * Microsoft Graph webhook flow:
  * 1. Subscription created → Microsoft sends validation request (GET with validationToken query param)
  * 2. We respond with the validationToken to confirm
  * 3. When email arrives → Microsoft sends POST with notification
- * 4. We verify clientState and trigger sync
+ * 4. We verify clientState and add job to queue
+ * 5. Worker processes job in background
  */
 export class OutlookWebhookHandler {
   constructor(
     private readonly findAccountBySubscriptionId: (
       subscriptionId: string
     ) => Promise<EmailAccount | null>,
-    private readonly triggerEmailSync: (
-      accountId: string,
-      messageId?: string
-    ) => Promise<void>
+    private readonly emailSyncQueue: EmailSyncQueue
   ) {}
 
   /**
@@ -160,12 +159,18 @@ export class OutlookWebhookHandler {
         return;
       }
 
-      console.log(`✓ Outlook webhook validated for ${account.email}, triggering sync`, {
+      console.log(`✓ Outlook webhook validated for ${account.email}, adding to queue`, {
         messageId,
       });
 
-      // 4. Trigger email sync (non-blocking, added to queue)
-      await this.triggerEmailSync(account.id, messageId);
+      // 4. Add sync job to queue (non-blocking)
+      const jobId = await this.emailSyncQueue.addSyncJob({
+        accountId: account.id,
+        messageId,
+        fullSync: false,
+      });
+
+      console.log(`✓ Sync job ${jobId} added to queue for account ${account.id}`);
     } catch (error: any) {
       console.error('Failed to process Outlook notification:', error);
       // Don't throw - we already responded to Microsoft

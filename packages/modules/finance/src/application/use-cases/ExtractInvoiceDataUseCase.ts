@@ -335,6 +335,24 @@ export class ExtractInvoiceDataUseCase {
     }
 
     const createResult = await this.vendorRepository.create(vendor);
+
+    if (createResult.isOk()) {
+      // Publish VendorCreated event
+      await this.eventBus.publish({
+        type: 'VendorCreated',
+        source: 'finance',
+        payload: {
+          vendorId: createResult.value.id,
+          vendorName: createResult.value.name,
+          vendorType: createResult.value.vendorType,
+          vatNumber: createResult.value.vatNumber,
+          createdBy: 'ai-extraction',
+          extractedFrom: extractedData,
+        },
+        timestamp: new Date(),
+      });
+    }
+
     return createResult;
   }
 

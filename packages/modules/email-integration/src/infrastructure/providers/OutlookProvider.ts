@@ -1,36 +1,12 @@
 import { Client } from '@microsoft/microsoft-graph-client';
-import { Result } from '@lifeOS/core/shared/result';
-import { BaseError, ExternalServiceError } from '@lifeOS/core/shared/errors';
-import { EmailAddress } from '../../domain/value-objects/EmailAddress';
-
-/**
- * Email metadata (lightweight, for filtering)
- */
-export interface EmailMetadata {
-  providerMessageId: string;
-  from: string;
-  fromName?: string;
-  to: string[];
-  subject: string;
-  snippet: string;
-  hasAttachments: boolean;
-  timestamp: Date;
-  labels: string[];
-}
-
-/**
- * Full email content (fetched on-demand)
- */
-export interface EmailContent extends EmailMetadata {
-  body: string;
-  htmlBody?: string;
-  attachments: Array<{
-    id: string;
-    name: string;
-    contentType: string;
-    size: number;
-  }>;
-}
+import { Result } from '@lifeOS/core/shared/result/Result';
+import { BaseError } from '@lifeOS/core/shared/errors/BaseError';
+import { ExternalServiceError } from '@lifeOS/core/shared/errors/ExternalServiceError';
+import {
+  IEmailProvider,
+  EmailMetadata,
+  EmailContent,
+} from '../../domain/interfaces/IEmailProvider';
 
 /**
  * Outlook Provider
@@ -44,7 +20,7 @@ export interface EmailContent extends EmailMetadata {
  * Rate limits:
  * - 10,000 requests per 10 minutes per app per user
  */
-export class OutlookProvider {
+export class OutlookProvider implements IEmailProvider {
   constructor(
     private readonly graphClientFactory: (accessToken: string) => Client
   ) {}
@@ -163,18 +139,27 @@ export class OutlookProvider {
    * Map Microsoft Graph message to EmailContent
    */
   private mapToEmailContent(message: any): EmailContent {
-    const metadata = this.mapToEmailMetadata(message);
+    const isHtml = message.body?.contentType === 'html';
 
     return {
-      ...metadata,
-      body: message.body?.content || '',
-      htmlBody: message.body?.contentType === 'html' ? message.body.content : undefined,
+      providerMessageId: message.id,
+      from: message.from?.emailAddress?.address || 'unknown',
+      fromName: message.from?.emailAddress?.name,
+      to: (message.toRecipients || []).map((r: any) => r.emailAddress.address),
+      cc: (message.ccRecipients || []).map((r: any) => r.emailAddress.address),
+      bcc: (message.bccRecipients || []).map((r: any) => r.emailAddress.address),
+      subject: message.subject || '(no subject)',
+      bodyText: isHtml ? '' : (message.body?.content || ''),
+      bodyHtml: isHtml ? message.body?.content : undefined,
+      hasAttachments: message.hasAttachments || false,
       attachments: (message.attachments || []).map((att: any) => ({
         id: att.id,
-        name: att.name,
+        filename: att.name,
         contentType: att.contentType,
         size: att.size,
       })),
+      timestamp: new Date(message.receivedDateTime),
+      labels: message.categories || [],
     };
   }
 }

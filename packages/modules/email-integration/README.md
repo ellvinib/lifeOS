@@ -1,6 +1,6 @@
 # Email Integration Module
 
-**Status:** ⚠️ **Outlook Integration Implemented** (Gmail and SMTP coming soon)
+**Status:** ✅ **Outlook & SMTP Integration Complete** (Gmail coming soon)
 
 Shared infrastructure module that enables LifeOS to receive and process emails from Gmail, Outlook, and SMTP providers.
 
@@ -308,17 +308,200 @@ if (req.query.validationToken) {
    - Webhooks must be served over HTTPS
    - Microsoft rejects HTTP endpoints
 
+## Implemented: SMTP/IMAP Integration
+
+### How It Works
+
+SMTP/IMAP integration uses standard IMAP protocol with IDLE extension for pseudo-push notifications:
+
+```
+User connects IMAP account (username/password)
+  ↓
+Email Module tests connection and checks IDLE support
+  ↓
+IMAP IDLE monitor established (or polling fallback)
+  ↓
+Server sends EXISTS notification when email arrives
+  ↓
+Email metadata synced + event published
+  ↓
+Domain modules process in background workers
+```
+
+### Key Components
+
+#### 1. **SmtpProvider** (`infrastructure/providers/`)
+- Fetches emails via IMAP protocol
+- Supports standard IMAP servers (Gmail, Outlook.com, custom)
+- Parses MIME messages to extract metadata
+
+#### 2. **SmtpConnectionManager** (`infrastructure/connections/`)
+- Tests IMAP connection and credentials
+- Checks server capabilities (IDLE support)
+- No subscription management (unlike Outlook/Gmail)
+
+#### 3. **SmtpIdleMonitor** (`infrastructure/monitors/`)
+- Maintains persistent IMAP IDLE connections
+- Receives near-instant notifications (~1s latency)
+- Auto-reconnects on disconnect
+- Fallback to 5-minute polling if IDLE unsupported
+
+### Setup Instructions
+
+#### Prerequisites
+
+1. **IMAP Server Access**
+   - IMAP host and port (usually 993 for SSL/TLS)
+   - Username and password
+   - IMAP enabled in email account settings
+
+2. **Common IMAP Settings**
+   ```
+   Gmail:
+   - IMAP: imap.gmail.com:993
+   - Enable IMAP in Gmail settings
+   - Use App Password (not account password)
+
+   Outlook.com:
+   - IMAP: outlook.office365.com:993
+   - Use account password
+
+   Custom Server:
+   - Check your email provider's documentation
+   ```
+
+#### Usage Example
+
+##### Connect SMTP Account (Application Layer)
+
+```typescript
+import { ConnectAccountUseCase } from '@lifeOS/email-integration';
+import { EmailProvider } from '@lifeOS/email-integration';
+
+const useCase = new ConnectAccountUseCase(
+  accountRepository,
+  {
+    smtp: smtpConnectionManager,
+  }
+);
+
+const result = await useCase.execute({
+  userId: 'user-123',
+  provider: EmailProvider.SMTP,
+  email: 'user@example.com',
+  emailName: 'John Doe',
+  credentials: {
+    username: 'user@example.com',
+    password: 'your-password', // Use app password for Gmail
+    imapHost: 'imap.gmail.com',
+    imapPort: 993,
+  },
+});
+
+if (result.isOk()) {
+  const account = result.value;
+  console.log('✓ SMTP account connected:', account.email);
+  console.log('✓ IDLE monitor started automatically');
+} else {
+  console.error('✗ Connection failed:', result.error.message);
+}
+```
+
+##### Connect via HTTP API
+
+```bash
+# Connect SMTP/IMAP account
+curl -X POST http://localhost:3000/api/email/accounts/connect \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "user-123",
+    "provider": "smtp",
+    "email": "user@gmail.com",
+    "emailName": "John Doe",
+    "credentials": {
+      "username": "user@gmail.com",
+      "password": "your-app-password",
+      "imapHost": "imap.gmail.com",
+      "imapPort": 993
+    }
+  }'
+
+# Response:
+# {
+#   "message": "Email account connected successfully",
+#   "account": {
+#     "id": "uuid-...",
+#     "provider": "smtp",
+#     "email": "user@gmail.com",
+#     "isActive": true,
+#     ...
+#   }
+# }
+```
+
+#### Start IMAP IDLE Monitor
+
+```typescript
+import { SmtpIdleMonitor } from '@lifeOS/email-integration';
+
+// Create monitor with email sync queue
+const monitor = new SmtpIdleMonitor(emailSyncQueue);
+
+// Start monitoring all SMTP accounts
+const smtpAccounts = await accountRepository.findByUser(userId, {
+  provider: EmailProvider.SMTP,
+  isActive: true,
+});
+
+for (const account of smtpAccounts) {
+  await monitor.startMonitoring(account);
+}
+
+// Monitor status
+const status = monitor.getStatus();
+console.log('SMTP Monitors:', status);
+// { totalMonitors: 3, idle: 2, polling: 1 }
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  await monitor.stopAll();
+});
+```
+
+### IMAP IDLE vs Polling
+
+| Feature | IMAP IDLE | Polling |
+|---------|-----------|---------|
+| **Latency** | ~1 second | ~5 minutes |
+| **Resource Usage** | Low (persistent connection) | Low (periodic checks) |
+| **Server Support** | Requires IDLE extension | All IMAP servers |
+| **Reliability** | Auto-reconnect on disconnect | Always works |
+
+The module automatically detects IDLE support and uses the best method available.
+
+### Security Considerations
+
+1. **Credential Storage**
+   - Passwords stored encrypted in database
+   - TODO: Implement proper KMS encryption
+   - Use app-specific passwords when available (Gmail)
+
+2. **Connection Security**
+   - SSL/TLS for port 993 (automatic)
+   - STARTTLS for port 143 (if needed)
+   - Secure password transmission
+
+3. **IMAP IDLE Safety**
+   - 29-minute timeout prevents stale connections
+   - Auto-reconnect with exponential backoff
+   - Graceful degradation to polling
+
 ## Coming Soon
 
 ### Gmail Integration
 - Cloud Pub/Sub webhooks
 - History API for incremental sync
 - OAuth 2.0 authentication
-
-### SMTP/IMAP Integration
-- IMAP IDLE for pseudo-push notifications
-- Fallback polling (every 5 minutes)
-- Username/password authentication
 
 ### Advanced Features
 - **Hybrid Filtering** (Quick filters + AI)

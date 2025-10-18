@@ -2,14 +2,15 @@ import { Queue, Worker, JobsOptions } from 'bullmq';
 import { PrismaClient } from '@prisma/client';
 import { EventBus } from '@lifeOS/core/events';
 import { getRedisConnectionOptions } from './redis';
-import {
-  RefreshAggregationsProcessor,
-  RefreshAggregationsJobData,
-} from './processors/RefreshAggregationsProcessor';
-import {
-  SyncBankTransactionsProcessor,
-  SyncBankTransactionsJobData,
-} from './processors/SyncBankTransactionsProcessor';
+// TODO: Re-enable after fixing finance module dependencies (csv-parse, multer)
+// import {
+//   RefreshAggregationsProcessor,
+//   RefreshAggregationsJobData,
+// } from './processors/RefreshAggregationsProcessor';
+// import {
+//   SyncBankTransactionsProcessor,
+//   SyncBankTransactionsJobData,
+// } from './processors/SyncBankTransactionsProcessor';
 
 /**
  * Job Queue Names
@@ -29,21 +30,23 @@ export class JobQueueManager {
   private queues: Map<JobQueueName, Queue> = new Map();
   private workers: Map<JobQueueName, Worker> = new Map();
 
-  private refreshAggregationsProcessor: RefreshAggregationsProcessor;
-  private syncBankTransactionsProcessor: SyncBankTransactionsProcessor;
+  // TODO: Re-enable after fixing finance module dependencies
+  // private refreshAggregationsProcessor: RefreshAggregationsProcessor;
+  // private syncBankTransactionsProcessor: SyncBankTransactionsProcessor;
 
   constructor(
     private readonly prisma: PrismaClient,
     private readonly eventBus: EventBus
   ) {
-    this.refreshAggregationsProcessor = new RefreshAggregationsProcessor(
-      this.prisma,
-      this.eventBus
-    );
-    this.syncBankTransactionsProcessor = new SyncBankTransactionsProcessor(
-      this.prisma,
-      this.eventBus
-    );
+    // TODO: Re-enable after fixing finance module dependencies
+    // this.refreshAggregationsProcessor = new RefreshAggregationsProcessor(
+    //   this.prisma,
+    //   this.eventBus
+    // );
+    // this.syncBankTransactionsProcessor = new SyncBankTransactionsProcessor(
+    //   this.prisma,
+    //   this.eventBus
+    // );
   }
 
   /**
@@ -54,29 +57,30 @@ export class JobQueueManager {
 
     const redisConnection = getRedisConnectionOptions();
 
+    // TODO: Re-enable after fixing finance module dependencies
     // Create queues
-    this.createQueue(JobQueueName.REFRESH_AGGREGATIONS, redisConnection);
-    this.createQueue(JobQueueName.SYNC_BANK_TRANSACTIONS, redisConnection);
+    // this.createQueue(JobQueueName.REFRESH_AGGREGATIONS, redisConnection);
+    // this.createQueue(JobQueueName.SYNC_BANK_TRANSACTIONS, redisConnection);
 
     // Create workers
-    this.createWorker(
-      JobQueueName.REFRESH_AGGREGATIONS,
-      this.refreshAggregationsProcessor.process.bind(
-        this.refreshAggregationsProcessor
-      ),
-      redisConnection
-    );
+    // this.createWorker(
+    //   JobQueueName.REFRESH_AGGREGATIONS,
+    //   this.refreshAggregationsProcessor.process.bind(
+    //     this.refreshAggregationsProcessor
+    //   ),
+    //   redisConnection
+    // );
 
-    this.createWorker(
-      JobQueueName.SYNC_BANK_TRANSACTIONS,
-      this.syncBankTransactionsProcessor.process.bind(
-        this.syncBankTransactionsProcessor
-      ),
-      redisConnection
-    );
+    // this.createWorker(
+    //   JobQueueName.SYNC_BANK_TRANSACTIONS,
+    //   this.syncBankTransactionsProcessor.process.bind(
+    //     this.syncBankTransactionsProcessor
+    //   ),
+    //   redisConnection
+    // );
 
     // Schedule recurring jobs (BullMQ v5 handles scheduling automatically)
-    await this.scheduleRecurringJobs();
+    // await this.scheduleRecurringJobs();
 
     console.log('[JobQueueManager] Job queues initialized successfully');
   }

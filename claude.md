@@ -2,6 +2,8 @@
 
 Zorg dat voor elke feature playwrite tests worden geschreven.
 
+werk test driven development uit
+
 ## Project Overview
 LifeOS is a comprehensive life management system that helps users track and manage all aspects of their life through modular, extensible architecture with AI-powered insights.
 

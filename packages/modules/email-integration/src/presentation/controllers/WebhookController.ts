@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { OutlookWebhookHandler } from '../../infrastructure/webhooks/OutlookWebhookHandler';
+import { GmailWebhookHandler } from '../../infrastructure/webhooks/GmailWebhookHandler';
 
 /**
  * Webhook Controller
@@ -13,8 +14,8 @@ import { OutlookWebhookHandler } from '../../infrastructure/webhooks/OutlookWebh
  */
 export class WebhookController {
   constructor(
-    private readonly outlookWebhookHandler: OutlookWebhookHandler
-    // Add Gmail webhook handler later
+    private readonly outlookWebhookHandler: OutlookWebhookHandler,
+    private readonly gmailWebhookHandler: GmailWebhookHandler
   ) {}
 
   /**
@@ -39,7 +40,9 @@ export class WebhookController {
   /**
    * Handle Gmail webhook (Pub/Sub push)
    *
-   * TODO: Implement Gmail webhook handler
+   * Google Cloud Pub/Sub sends POST requests with notification payload.
+   * Handler decodes base64 message, validates timestamp, finds account,
+   * and queues a history sync job.
    */
   handleGmailWebhook = async (
     req: Request,
@@ -47,8 +50,7 @@ export class WebhookController {
     next: NextFunction
   ): Promise<void> => {
     try {
-      // TODO: Implement Gmail webhook handling
-      res.status(501).json({ error: 'Gmail webhook not yet implemented' });
+      await this.gmailWebhookHandler.handle(req, res);
     } catch (error) {
       next(error);
     }
