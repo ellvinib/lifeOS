@@ -1,0 +1,163 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - link [ref=e7] [cursor=pointer]:
+          - /url: /finance
+          - img [ref=e8]
+        - heading "Budget Enveloppen" [level=1] [ref=e11]
+      - button "Nieuwe envelope" [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+        - generic [ref=e14]: Nieuwe envelope
+    - generic [ref=e15]:
+      - paragraph [ref=e17]: 2025-10
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - paragraph [ref=e23]: Totaal budget
+          - paragraph [ref=e24]: €3000.00
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - img [ref=e27]
+            - paragraph [ref=e30]: Uitgegeven
+          - paragraph [ref=e31]: €0.00
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - img [ref=e34]
+            - paragraph [ref=e37]: Resterend
+          - paragraph [ref=e38]: €3000.00
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - heading "Jouw enveloppen" [level=2] [ref=e42]
+            - button "Geld verplaatsen →" [ref=e43] [cursor=pointer]
+          - generic [ref=e44]:
+            - button "🏥 Zorgkosten €720 uitgegeven €0 van €100 720 720% gebruikt ⚠️ Bijna op!" [ref=e45] [cursor=pointer]:
+              - generic [ref=e46]:
+                - generic [ref=e47]:
+                  - generic [ref=e48]: 🏥
+                  - generic [ref=e49]:
+                    - heading "Zorgkosten" [level=3] [ref=e50]
+                    - paragraph [ref=e51]: €720 uitgegeven
+                - generic [ref=e52]:
+                  - generic [ref=e55]: €0
+                  - paragraph [ref=e56]: van €100
+              - progressbar [ref=e59]
+              - generic [ref=e60]:
+                - generic [ref=e61]: 720% gebruikt
+                - generic [ref=e62]: ⚠️ Bijna op!
+            - button "🛒 Boodschappen €2507 uitgegeven €0 van €400 627 627% gebruikt ⚠️ Bijna op!" [ref=e63] [cursor=pointer]:
+              - generic [ref=e64]:
+                - generic [ref=e65]:
+                  - generic [ref=e66]: 🛒
+                  - generic [ref=e67]:
+                    - heading "Boodschappen" [level=3] [ref=e68]
+                    - paragraph [ref=e69]: €2507 uitgegeven
+                - generic [ref=e70]:
+                  - generic [ref=e73]: €0
+                  - paragraph [ref=e74]: van €400
+              - progressbar [ref=e77]
+              - generic [ref=e78]:
+                - generic [ref=e79]: 627% gebruikt
+                - generic [ref=e80]: ⚠️ Bijna op!
+            - button "🍽️ Uit eten €1154.5 uitgegeven €0 van €250 462 462% gebruikt ⚠️ Bijna op!" [ref=e81] [cursor=pointer]:
+              - generic [ref=e82]:
+                - generic [ref=e83]:
+                  - generic [ref=e84]: 🍽️
+                  - generic [ref=e85]:
+                    - heading "Uit eten" [level=3] [ref=e86]
+                    - paragraph [ref=e87]: €1154.5 uitgegeven
+                - generic [ref=e88]:
+                  - generic [ref=e91]: €0
+                  - paragraph [ref=e92]: van €250
+              - progressbar [ref=e95]
+              - generic [ref=e96]:
+                - generic [ref=e97]: 462% gebruikt
+                - generic [ref=e98]: ⚠️ Bijna op!
+            - button "🚗 Transport €837 uitgegeven €0 van €200 418 418% gebruikt ⚠️ Bijna op!" [ref=e99] [cursor=pointer]:
+              - generic [ref=e100]:
+                - generic [ref=e101]:
+                  - generic [ref=e102]: 🚗
+                  - generic [ref=e103]:
+                    - heading "Transport" [level=3] [ref=e104]
+                    - paragraph [ref=e105]: €837 uitgegeven
+                - generic [ref=e106]:
+                  - generic [ref=e109]: €0
+                  - paragraph [ref=e110]: van €200
+              - progressbar [ref=e113]
+              - generic [ref=e114]:
+                - generic [ref=e115]: 418% gebruikt
+                - generic [ref=e116]: ⚠️ Bijna op!
+            - button "🛍️ Shopping €240 uitgegeven €0 van €200 120 120% gebruikt ⚠️ Bijna op!" [ref=e117] [cursor=pointer]:
+              - generic [ref=e118]:
+                - generic [ref=e119]:
+                  - generic [ref=e120]: 🛍️
+                  - generic [ref=e121]:
+                    - heading "Shopping" [level=3] [ref=e122]
+                    - paragraph [ref=e123]: €240 uitgegeven
+                - generic [ref=e124]:
+                  - generic [ref=e127]: €0
+                  - paragraph [ref=e128]: van €200
+              - progressbar [ref=e131]
+              - generic [ref=e132]:
+                - generic [ref=e133]: 120% gebruikt
+                - generic [ref=e134]: ⚠️ Bijna op!
+            - button "🏠 Wonen €1000 uitgegeven €0 van €1000 100 100% gebruikt ⚠️ Bijna op!" [ref=e135] [cursor=pointer]:
+              - generic [ref=e136]:
+                - generic [ref=e137]:
+                  - generic [ref=e138]: 🏠
+                  - generic [ref=e139]:
+                    - heading "Wonen" [level=3] [ref=e140]
+                    - paragraph [ref=e141]: €1000 uitgegeven
+                - generic [ref=e142]:
+                  - generic [ref=e145]: €0
+                  - paragraph [ref=e146]: van €1000
+              - progressbar [ref=e149]
+              - generic [ref=e150]:
+                - generic [ref=e151]: 100% gebruikt
+                - generic [ref=e152]: ⚠️ Bijna op!
+            - button "📦 Overig €240 uitgegeven €160 van €400 60 60% gebruikt" [ref=e153] [cursor=pointer]:
+              - generic [ref=e154]:
+                - generic [ref=e155]:
+                  - generic [ref=e156]: 📦
+                  - generic [ref=e157]:
+                    - heading "Overig" [level=3] [ref=e158]
+                    - paragraph [ref=e159]: €240 uitgegeven
+                - generic [ref=e160]:
+                  - generic [ref=e163]: €160
+                  - paragraph [ref=e164]: van €400
+              - progressbar [ref=e167]
+              - generic [ref=e169]: 60% gebruikt
+            - button "💡 Utilities €75 uitgegeven €75 van €150 50 50% gebruikt" [ref=e170] [cursor=pointer]:
+              - generic [ref=e171]:
+                - generic [ref=e172]:
+                  - generic [ref=e173]: 💡
+                  - generic [ref=e174]:
+                    - heading "Utilities" [level=3] [ref=e175]
+                    - paragraph [ref=e176]: €75 uitgegeven
+                - generic [ref=e177]:
+                  - generic [ref=e180]: €75
+                  - paragraph [ref=e181]: van €150
+              - progressbar [ref=e184]
+              - generic [ref=e186]: 50% gebruikt
+            - button "🎬 Vrije tijd €30 uitgegeven €270 van €300 10 10% gebruikt" [ref=e187] [cursor=pointer]:
+              - generic [ref=e188]:
+                - generic [ref=e189]:
+                  - generic [ref=e190]: 🎬
+                  - generic [ref=e191]:
+                    - heading "Vrije tijd" [level=3] [ref=e192]
+                    - paragraph [ref=e193]: €30 uitgegeven
+                - generic [ref=e194]:
+                  - generic [ref=e197]: €270
+                  - paragraph [ref=e198]: van €300
+              - progressbar [ref=e201]
+              - generic [ref=e203]: 10% gebruikt
+        - generic [ref=e205]:
+          - generic [ref=e206]: 👈
+          - paragraph [ref=e207]: Selecteer een envelope om details te zien
+  - alert [ref=e208]
+```

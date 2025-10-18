@@ -1,5 +1,6 @@
 import 'express-async-errors'; // Must be first! Handles async errors in routes
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -10,6 +11,10 @@ import { DatabaseClient } from './infrastructure/database/DatabaseClient';
 import { TaskRepository } from './infrastructure/repositories/TaskRepository';
 import { createTaskRoutes } from './presentation/routes/taskRoutes';
 import { errorHandler, notFoundHandler } from './presentation/middleware/errorHandler';
+import { JobQueueManager } from './infrastructure/jobs';
+import { setupApolloServer } from './graphql/apollo';
+import { createRedisConnection } from './infrastructure/jobs/redis';
+import { RedisCacheService, DashboardCacheService } from './infrastructure/cache';
 
 /**
  * Main server application.
@@ -45,6 +50,29 @@ function createApp(): express.Application {
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('combined'));
   }
+
+  // ========== Root Route ==========
+  app.get('/', (req, res) => {
+    const port = process.env.PORT || 3000;
+    res.json({
+      name: 'LifeOS API',
+      version: '1.0.0',
+      status: 'running',
+      timestamp: new Date().toISOString(),
+      endpoints: {
+        rest: `http://localhost:${port}/api`,
+        graphql: `http://localhost:${port}/graphql`,
+        health: `http://localhost:${port}/health`,
+      },
+      modules: {
+        tasks: `http://localhost:${port}/api/tasks`,
+        garden: `http://localhost:${port}/api/garden`,
+        finance: `http://localhost:${port}/api/finance`,
+        auth: `http://localhost:${port}/api/auth`,
+      },
+      documentation: 'https://github.com/yourusername/lifeOS',
+    });
+  });
 
   // ========== Health Check ==========
   app.get('/health', async (req, res) => {
@@ -85,10 +113,17 @@ function createApp(): express.Application {
     eventBus
   ));
 
-  // ========== Error Handling ==========
-  // Must be LAST!
-  app.use(notFoundHandler); // 404 handler
-  app.use(errorHandler);    // Global error handler
+  // Finance module routes (full implementation)
+  const { createFinanceRoutes } = require('../../modules/finance/src/presentation/routes');
+  const prisma = DatabaseClient.getInstance();
+  app.use('/api/finance', createFinanceRoutes(prisma, eventBus));
+
+  // Authentication routes
+  const { createAuthRoutes } = require('./presentation/routes/auth.routes');
+  app.use('/api/auth', createAuthRoutes(prisma));
+
+  // Note: Error handlers will be registered AFTER GraphQL middleware in startServer()
+  // This allows GraphQL routes to be registered before the catch-all 404 handler
 
   return app;
 }
@@ -97,22 +132,52 @@ function createApp(): express.Application {
  * Start the server.
  */
 async function startServer(): Promise<void> {
+  let jobQueueManager: JobQueueManager | null = null;
+  let redisCacheService: RedisCacheService | null = null;
+
   try {
     // Connect to database
     await DatabaseClient.connect();
 
+    // Initialize shared dependencies
+    const prisma = DatabaseClient.getInstance();
+    const eventStore = new EventStore();
+    const eventBus = new EventBus(eventStore);
+
+    // Initialize Redis cache
+    const redisClient = createRedisConnection();
+    redisCacheService = new RedisCacheService(redisClient);
+    const dashboardCache = new DashboardCacheService(redisCacheService);
+    console.log('✓ Redis cache initialized');
+
+    // Initialize job queue manager
+    jobQueueManager = new JobQueueManager(prisma, eventBus);
+    await jobQueueManager.initialize();
+
     // Create Express app
     const app = createApp();
 
+    // Create HTTP server
+    const httpServer = http.createServer(app);
+
+    // Setup Apollo GraphQL server with cache
+    await setupApolloServer(app, httpServer, prisma, eventBus, dashboardCache);
+
+    // ========== Error Handling ==========
+    // Must be LAST! After all routes including GraphQL
+    app.use(notFoundHandler); // 404 handler
+    app.use(errorHandler);    // Global error handler
+
     // Start HTTP server
     const port = process.env.PORT || 3000;
-    const server = app.listen(port, () => {
+    httpServer.listen(port, () => {
       console.log('');
       console.log('✓ Server started successfully');
       console.log(`✓ Listening on port ${port}`);
       console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log('');
-      console.log(`API: http://localhost:${port}/api`);
+      console.log(`REST API: http://localhost:${port}/api`);
+      console.log(`GraphQL: http://localhost:${port}/graphql`);
       console.log(`Health: http://localhost:${port}/health`);
       console.log('');
     });
@@ -122,10 +187,21 @@ async function startServer(): Promise<void> {
       console.log(`\n${signal} received, shutting down gracefully...`);
 
       // Close HTTP server (stop accepting new connections)
-      server.close(async () => {
+      httpServer.close(async () => {
         console.log('✓ HTTP server closed');
 
         try {
+          // Shutdown job queues
+          if (jobQueueManager) {
+            await jobQueueManager.shutdown();
+          }
+
+          // Disconnect Redis cache
+          if (redisCacheService) {
+            await redisCacheService.disconnect();
+            console.log('✓ Redis cache disconnected');
+          }
+
           // Disconnect from database
           await DatabaseClient.disconnect();
 

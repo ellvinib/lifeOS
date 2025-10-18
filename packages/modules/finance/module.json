@@ -1,0 +1,30 @@
+{
+  "name": "finance",
+  "version": "1.0.0",
+  "description": "Personal finance management including expenses, budgets, insurance, loans, bill tracking, and advertising ROI analytics",
+  "author": "LifeOS",
+  "permissions": [
+    "calendar.read",
+    "notifications.send"
+  ],
+  "dependencies": {
+    "core": "^1.0.0"
+  },
+  "events": {
+    "subscribes": ["MonthEnded", "BillDue"],
+    "publishes": [
+      "ExpenseCreated",
+      "BudgetExceeded",
+      "BillDue",
+      "InsuranceRenewalDue",
+      "LoanPaymentDue",
+      "AdvertisingExpenseCreated",
+      "AdvertisingExpenseUpdated",
+      "AdvertisingExpenseDeleted",
+      "CampaignCreated",
+      "CampaignUpdated",
+      "CampaignCompleted",
+      "ROIThresholdReached"
+    ]
+  }
+}
