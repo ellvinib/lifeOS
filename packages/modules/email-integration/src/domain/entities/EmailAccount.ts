@@ -136,8 +136,15 @@ export class EmailAccount {
    * Outlook: { subscriptionId, subscriptionExpiration, webhookSecret }
    * SMTP: { imapHost, imapPort, smtpHost, smtpPort }
    */
-  getProviderData(): Record<string, any> {
+  get providerData(): Record<string, any> {
     return { ...this._providerData }; // Return copy
+  }
+
+  /**
+   * Get provider-specific data (method form)
+   */
+  getProviderData(): Record<string, any> {
+    return this.providerData;
   }
 
   /**
@@ -146,6 +153,13 @@ export class EmailAccount {
   setProviderData(data: Record<string, any>): void {
     this._providerData = { ...this._providerData, ...data };
     this._updatedAt = new Date();
+  }
+
+  /**
+   * Update provider-specific data (alias for setProviderData)
+   */
+  updateProviderData(data: Record<string, any>): void {
+    this.setProviderData(data);
   }
 
   /**
@@ -169,6 +183,14 @@ export class EmailAccount {
    */
   updateLastSynced(): void {
     this._lastSyncedAt = new Date();
+    this._updatedAt = new Date();
+  }
+
+  /**
+   * Update last synced timestamp with specific date (alias for updateLastSynced)
+   */
+  updateLastSyncedAt(date: Date): void {
+    this._lastSyncedAt = date;
     this._updatedAt = new Date();
   }
 
@@ -229,10 +251,10 @@ export class EmailAccount {
       return true; // No expiration set, needs setup
     }
 
-    const expirationMs = parseInt(watchExpiration);
-    const oneDayFromNow = Date.now() + 24 * 60 * 60 * 1000;
+    const expiration = new Date(watchExpiration);
+    const oneDayFromNow = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    return expirationMs < oneDayFromNow;
+    return expiration < oneDayFromNow;
   }
 
   /**

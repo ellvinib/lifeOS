@@ -26,7 +26,7 @@ export * from './application/dtos/EmailAccountDTO';
 export * from './application/dtos/EmailDTO';
 export * from './application/use-cases/ConnectAccountUseCase';
 export * from './application/use-cases/DisconnectAccountUseCase';
-export * from './application/use-cases/SyncEmailsUseCase';
+export { SyncEmailsUseCase } from './application/use-cases/SyncEmailsUseCase'; // Named export to avoid EmailMetadata conflict
 export * from './application/use-cases/GetEmailUseCase';
 export * from './application/use-cases/GmailHistorySyncUseCase';
 
@@ -52,3 +52,7 @@ export * from './infrastructure/queues/EmailSyncQueue';
 export * from './presentation/controllers/EmailAccountController';
 export * from './presentation/controllers/WebhookController';
 export * from './presentation/routes';
+
+// Module Export
+export { EmailIntegrationModule } from './module';
+export { default } from './module';

@@ -1,4 +1,5 @@
 import { OutlookConnectionManager } from '../connections/OutlookConnectionManager';
+import { GmailConnectionManager } from '../connections/GmailConnectionManager';
 import { EmailAccount } from '../../domain/entities/EmailAccount';
 import { EmailProvider } from '../../domain/value-objects/EmailProvider';
 
@@ -19,8 +20,8 @@ export class SubscriptionRenewalJob {
   constructor(
     private readonly findAllActiveAccounts: () => Promise<EmailAccount[]>,
     private readonly outlookConnectionManager: OutlookConnectionManager,
+    private readonly gmailConnectionManager: GmailConnectionManager,
     private readonly updateAccount: (account: EmailAccount) => Promise<void>
-    // Add Gmail connection manager later
   ) {}
 
   /**
@@ -88,8 +89,7 @@ export class SubscriptionRenewalJob {
         return await this.renewOutlookIfNeeded(account);
 
       case EmailProvider.GMAIL:
-        // TODO: Implement Gmail renewal
-        return false;
+        return await this.renewGmailIfNeeded(account);
 
       default:
         return false;
@@ -114,6 +114,27 @@ export class SubscriptionRenewalJob {
     }
 
     console.log(`[SubscriptionRenewalJob] ✓ Outlook subscription renewed for ${account.email}`);
+    return true;
+  }
+
+  /**
+   * Renew Gmail watch if expiring soon
+   */
+  private async renewGmailIfNeeded(account: EmailAccount): Promise<boolean> {
+    if (!account.gmailWatchNeedsRenewal()) {
+      console.log(`[SubscriptionRenewalJob] Gmail watch for ${account.email} is still valid`);
+      return false;
+    }
+
+    console.log(`[SubscriptionRenewalJob] Renewing Gmail watch for ${account.email}...`);
+
+    const result = await this.gmailConnectionManager.renew(account);
+
+    if (result.isFail()) {
+      throw new Error(`Renewal failed: ${result.error.message}`);
+    }
+
+    console.log(`[SubscriptionRenewalJob] ✓ Gmail watch renewed for ${account.email}`);
     return true;
   }
 }

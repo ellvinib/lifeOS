@@ -2,8 +2,8 @@ import { Email as PrismaEmail, EmailProvider as PrismaEmailProvider } from '@pri
 import { Email } from '../../domain/entities/Email';
 import { EmailProvider } from '../../domain/value-objects/EmailProvider';
 import { EmailAddress } from '../../domain/value-objects/EmailAddress';
-import { Result } from '@lifeOS/core/shared/result/Result';
-import { ValidationError } from '@lifeOS/core/shared/errors/ValidationError';
+import { Result } from '@lifeos/core/shared/result';
+import { ValidationError } from '@lifeos/core/shared/errors';
 
 /**
  * Email Prisma Mapper

@@ -1,262 +1,219 @@
-import type { DomainEvent, EventHandler } from '../events';
+import { Router } from 'express';
+import { EventHandler } from '../events/DomainEvent';
 
 /**
- * Module manifest defining module metadata and dependencies.
- * This should be provided in a module.json file in each module.
- */
-export interface ModuleManifest {
-  /**
-   * Unique module name (e.g., "garden", "finance")
-   */
-  name: string;
-
-  /**
-   * Semantic version
-   */
-  version: string;
-
-  /**
-   * Human-readable description
-   */
-  description: string;
-
-  /**
-   * Module author
-   */
-  author: string;
-
-  /**
-   * Required permissions
-   */
-  permissions: Permission[];
-
-  /**
-   * Module dependencies (name -> version)
-   */
-  dependencies: Record<string, string>;
-
-  /**
-   * Events this module subscribes to
-   */
-  events?: {
-    subscribes: string[];
-    publishes: string[];
-  };
-}
-
-/**
- * Permission types that modules can request
- */
-export type Permission =
-  | 'calendar.read'
-  | 'calendar.write'
-  | 'email.read'
-  | 'notifications.send'
-  | 'filesystem.read'
-  | 'filesystem.write'
-  | 'network.access';
-
-/**
- * Route definition for module API endpoints
- */
-export interface Route {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  path: string;
-  handler: (req: unknown, res: unknown) => Promise<unknown>;
-}
-
-/**
- * UI Component registration
- */
-export interface ComponentRegistry {
-  /**
-   * Dashboard widgets
-   */
-  widgets?: Array<{
-    id: string;
-    component: unknown; // React component
-    defaultSize?: { width: number; height: number };
-  }>;
-
-  /**
-   * Navigation items
-   */
-  navigationItems?: Array<{
-    id: string;
-    label: string;
-    icon?: string;
-    path: string;
-    order?: number;
-  }>;
-
-  /**
-   * Settings panels
-   */
-  settingsPanels?: Array<{
-    id: string;
-    label: string;
-    component: unknown;
-  }>;
-}
-
-/**
- * Database migration definition
- */
-export interface Migration {
-  /**
-   * Migration version (timestamp or sequential number)
-   */
-  version: string;
-
-  /**
-   * Migration name
-   */
-  name: string;
-
-  /**
-   * SQL to run when migrating up
-   */
-  up: string;
-
-  /**
-   * SQL to run when rolling back
-   */
-  down: string;
-
-  /**
-   * Dependencies on other migrations
-   */
-  dependencies?: string[];
-}
-
-/**
- * Module context provided during initialization.
- * Gives modules access to core services.
- */
-export interface ModuleContext {
-  /**
-   * Event bus for pub/sub communication
-   */
-  eventBus: {
-    publish: <T = unknown>(event: DomainEvent<T>) => Promise<void>;
-    subscribe: (
-      eventType: string,
-      handler: EventHandler,
-      priority?: number
-    ) => string;
-    unsubscribe: (subscriptionId: string) => boolean;
-  };
-
-  /**
-   * Logger instance scoped to this module
-   */
-  logger: {
-    info: (message: string, meta?: Record<string, unknown>) => void;
-    warn: (message: string, meta?: Record<string, unknown>) => void;
-    error: (message: string, meta?: Record<string, unknown>) => void;
-    debug: (message: string, meta?: Record<string, unknown>) => void;
-  };
-
-  /**
-   * Configuration for this module
-   */
-  config: Record<string, unknown>;
-
-  /**
-   * Database connection (if module has database access permission)
-   */
-  database?: unknown; // Will be typed properly when implementing database layer
-
-  /**
-   * Other core services can be added here
-   * (cache, job queue, file storage, etc.)
-   */
-}
-
-/**
- * Main module interface that all modules must implement.
- * Follows the Strategy pattern - each module implements this interface differently.
+ * Module Interface
+ *
+ * All LifeOS modules must implement this interface.
+ * Provides lifecycle hooks, route registration, and event handling.
+ *
+ * Following principles:
+ * - Modules are self-contained units of functionality
+ * - Modules communicate via events (loose coupling)
+ * - Modules expose REST APIs via routes
+ * - Modules manage their own data and migrations
  */
 export interface IModule {
   /**
-   * Module metadata
+   * Module name (must match module.json)
+   * Example: "finance", "garden", "calendar"
    */
-  readonly manifest: ModuleManifest;
+  readonly name: string;
 
   /**
-   * Initialize the module.
-   * Called when module is loaded.
-   * Should set up event subscriptions, database connections, etc.
+   * Module version (semantic versioning)
+   * Example: "1.0.0"
+   */
+  readonly version: string;
+
+  /**
+   * Module description
+   */
+  readonly description?: string;
+
+  /**
+   * Initialize module
    *
-   * @param context - Module context with access to core services
+   * Called once when the module is loaded.
+   * Use this to:
+   * - Set up repositories and services
+   * - Subscribe to events
+   * - Initialize background workers
+   * - Validate configuration
+   *
+   * @param context Module context with dependencies
+   * @returns Promise that resolves when initialization is complete
    */
   initialize(context: ModuleContext): Promise<void>;
 
   /**
-   * Shutdown the module gracefully.
-   * Called when application is shutting down.
-   * Should clean up resources, close connections, etc.
+   * Shutdown module
+   *
+   * Called when the application is shutting down.
+   * Use this to:
+   * - Close database connections
+   * - Stop background workers
+   * - Clean up resources
+   *
+   * @returns Promise that resolves when shutdown is complete
    */
   shutdown(): Promise<void>;
 
   /**
-   * Get API routes this module provides.
-   * These will be registered with the API server.
+   * Get module routes
+   *
+   * Returns Express router with all module endpoints.
+   * Routes will be mounted at /api/{moduleName}
+   *
+   * @returns Express router or null if no routes
    */
-  getRoutes(): Route[];
+  getRoutes(): Router | null;
 
   /**
-   * Get GraphQL schema for this module.
-   * Will be stitched into the main GraphQL schema.
+   * Get event handlers
+   *
+   * Returns map of event types to handler functions.
+   * Module will be automatically subscribed to these events.
+   *
+   * @returns Event handler map or null if no handlers
    */
-  getGraphQLSchema?(): string; // GraphQL SDL string
+  getEventHandlers(): EventHandlerMap | null;
 
   /**
-   * Get UI components this module provides.
-   * These will be registered with the frontend.
-   */
-  getUIComponents(): ComponentRegistry;
-
-  /**
-   * Get event handlers for this module.
-   * Alternative to subscribing in initialize().
-   */
-  getEventHandlers(): Record<string, EventHandler>;
-
-  /**
-   * Get database migrations for this module.
-   * These will be run during database setup/updates.
-   */
-  getMigrations(): Migration[];
-
-  /**
-   * Health check for this module.
+   * Health check
+   *
+   * Returns module health status.
    * Used for monitoring and diagnostics.
+   *
+   * @returns Health status
    */
-  healthCheck?(): Promise<{ healthy: boolean; message?: string }>;
+  healthCheck(): Promise<ModuleHealth>;
 }
 
 /**
- * Module state tracking
+ * Module Context
+ *
+ * Provided to modules during initialization.
+ * Contains shared dependencies and configuration.
  */
-export enum ModuleState {
-  UNLOADED = 'unloaded',
-  LOADING = 'loading',
-  LOADED = 'loaded',
-  INITIALIZING = 'initializing',
-  READY = 'ready',
-  ERROR = 'error',
-  SHUTTING_DOWN = 'shutting_down',
-  SHUTDOWN = 'shutdown',
+export interface ModuleContext {
+  /**
+   * Prisma database client
+   */
+  prisma: any; // PrismaClient
+
+  /**
+   * Event bus for publishing/subscribing to events
+   */
+  eventBus: any; // IEventBus
+
+  /**
+   * Job queue for background processing (optional)
+   */
+  jobQueue?: any; // IJobQueue
+
+  /**
+   * Module configuration from environment/config files
+   */
+  config: Record<string, any>;
+
+  /**
+   * Logger instance
+   */
+  logger?: any; // ILogger
+
+  /**
+   * Base path for file storage
+   */
+  storagePath?: string;
+
+  /**
+   * Application environment
+   */
+  env: 'development' | 'production' | 'test';
 }
 
 /**
- * Module information tracked by the registry
+ * Event Handler Map
+ *
+ * Maps event types to handler functions.
+ * Uses EventHandler from events/DomainEvent.
  */
-export interface ModuleInfo {
-  module: IModule;
-  state: ModuleState;
-  error?: Error;
-  loadedAt?: Date;
-  initializedAt?: Date;
+export type EventHandlerMap = {
+  [eventType: string]: EventHandler;
+};
+
+/**
+ * Module Health Status
+ */
+export interface ModuleHealth {
+  /**
+   * Module name
+   */
+  module: string;
+
+  /**
+   * Overall health status
+   */
+  status: 'healthy' | 'degraded' | 'unhealthy';
+
+  /**
+   * Timestamp of health check
+   */
+  timestamp: Date;
+
+  /**
+   * Individual component checks
+   */
+  checks: {
+    [component: string]: {
+      status: 'pass' | 'warn' | 'fail';
+      message?: string;
+      latency?: number;
+    };
+  };
+
+  /**
+   * Additional metadata
+   */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Module Metadata
+ *
+ * Parsed from module.json
+ */
+export interface ModuleMetadata {
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  license?: string;
+  main: string;
+  permissions: string[];
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  events?: {
+    subscribes?: string[];
+    publishes?: string[];
+  };
+  routes?: {
+    baseUrl: string;
+    endpoints: string[];
+  };
+  jobs?: Array<{
+    name: string;
+    description: string;
+    schedule: string | null;
+    priority: string;
+  }>;
+  config?: Record<string, any>;
+  database?: {
+    tables: string[];
+    migrations: string;
+  };
+  features?: Record<string, any>;
+  documentation?: Record<string, string>;
+  tags?: string[];
 }

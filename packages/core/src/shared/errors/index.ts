@@ -9,3 +9,5 @@ export * from './NotFoundError';
 export * from './ValidationError';
 export * from './BusinessRuleError';
 export * from './DatabaseError';
+export * from './ModuleError';
+export * from './ExternalServiceError';

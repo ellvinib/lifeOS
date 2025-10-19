@@ -41,6 +41,9 @@ export enum ErrorCode {
   QUERY_FAILED = 'QUERY_FAILED',
   CONNECTION_FAILED = 'CONNECTION_FAILED',
   TRANSACTION_FAILED = 'TRANSACTION_FAILED',
+
+  // External service errors (9000-9999)
+  EXTERNAL_SERVICE_ERROR = 'EXTERNAL_SERVICE_ERROR',
 }
 
 /**
@@ -85,4 +88,7 @@ export const ErrorCodeToHttpStatus: Record<ErrorCode, number> = {
   [ErrorCode.QUERY_FAILED]: 500,
   [ErrorCode.CONNECTION_FAILED]: 503,
   [ErrorCode.TRANSACTION_FAILED]: 500,
+
+  // External service errors
+  [ErrorCode.EXTERNAL_SERVICE_ERROR]: 503,
 };

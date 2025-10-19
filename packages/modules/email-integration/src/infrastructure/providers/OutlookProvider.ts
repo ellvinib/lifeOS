@@ -1,7 +1,7 @@
 import { Client } from '@microsoft/microsoft-graph-client';
-import { Result } from '@lifeOS/core/shared/result/Result';
-import { BaseError } from '@lifeOS/core/shared/errors/BaseError';
-import { ExternalServiceError } from '@lifeOS/core/shared/errors/ExternalServiceError';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError } from '@lifeos/core/shared/errors';
+import { ExternalServiceError } from '@lifeos/core/shared/errors';
 import {
   IEmailProvider,
   EmailMetadata,

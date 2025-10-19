@@ -1,15 +1,17 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: lifeos-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: lifeos
       POSTGRES_PASSWORD: lifeos_dev_password
-      POSTGRES_DB: lifeos_db
+      POSTGRES_DB: lifeos
     ports:
-      - '5434:5432'
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,19 +20,59 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis (for job queue and caching)
   redis:
     image: redis:7-alpine
     container_name: lifeos-redis
+    restart: unless-stopped
     ports:
       - '6379:6379'
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 5
+
+  # API Server (Node.js)
+  api:
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile
+    container_name: lifeos-api
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://lifeos:lifeos_dev_password@postgres:5432/lifeos
+      REDIS_URL: redis://redis:6379
+      FILE_STORAGE_PATH: /app/data
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      MAILGUN_SIGNING_KEY: ${MAILGUN_SIGNING_KEY:-}
+      MAILGUN_API_KEY: ${MAILGUN_API_KEY:-}
+    volumes:
+      - ./packages:/app/packages
+      - ./node_modules:/app/node_modules
+      - api_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run dev
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+  api_data:
+    driver: local
+
+networks:
+  default:
+    name: lifeos-network

@@ -1,5 +1,5 @@
-import { Result } from '@lifeOS/core/shared/result';
-import { BaseError, NotFoundError, BusinessRuleError } from '@lifeOS/core/shared/errors';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError, BusinessRuleError } from '@lifeos/core/shared/errors';
 import { EmailAccount } from '../../domain/entities/EmailAccount';
 import { EmailProvider } from '../../domain/value-objects/EmailProvider';
 import { IEmailAccountRepository } from '../../domain/interfaces/IEmailAccountRepository';

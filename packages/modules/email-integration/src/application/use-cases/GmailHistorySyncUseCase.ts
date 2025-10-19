@@ -3,12 +3,12 @@ import { IEmailAccountRepository } from '../../domain/interfaces/IEmailAccountRe
 import { IEmailRepository } from '../../domain/interfaces/IEmailRepository';
 import { Email } from '../../domain/entities/Email';
 import { EmailAddress } from '../../domain/value-objects/EmailAddress';
-import { Result } from '@lifeOS/core/shared/result/Result';
-import { BaseError } from '@lifeOS/core/shared/errors/BaseError';
-import { BusinessRuleError } from '@lifeOS/core/shared/errors/BusinessRuleError';
-import { ExternalServiceError } from '@lifeOS/core/shared/errors/ExternalServiceError';
-import { ValidationError } from '@lifeOS/core/shared/errors/ValidationError';
-import { IEventPublisher } from '@lifeOS/core/events/IEventPublisher';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError } from '@lifeos/core/shared/errors';
+import { BusinessRuleError } from '@lifeos/core/shared/errors';
+import { ExternalServiceError } from '@lifeos/core/shared/errors';
+import { ValidationError } from '@lifeos/core/shared/errors';
+import { IEventPublisher, DomainEvent } from '@lifeos/core/events';
 import { SyncEmailsUseCase } from './SyncEmailsUseCase';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -386,9 +386,12 @@ export class GmailHistorySyncUseCase {
    */
   private async publishEmailReceivedEvent(email: Email): Promise<void> {
     try {
-      await this.eventPublisher.publish({
+      const event: DomainEvent = {
+        id: uuidv4(),
         type: 'EmailReceived',
         source: 'email-integration',
+        timestamp: new Date(),
+        version: 1,
         payload: {
           emailId: email.id,
           accountId: email.accountId,
@@ -411,7 +414,9 @@ export class GmailHistorySyncUseCase {
           syncedAt: new Date().toISOString(),
           syncMethod: 'gmail-history-api',
         },
-      });
+      };
+
+      await this.eventPublisher.publish(event);
     } catch (error) {
       console.error(`Failed to publish EmailReceived event: ${error}`);
     }

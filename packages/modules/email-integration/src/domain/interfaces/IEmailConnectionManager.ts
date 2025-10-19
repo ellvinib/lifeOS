@@ -1,5 +1,5 @@
-import { Result } from '@lifeOS/core/shared/result';
-import { BaseError } from '@lifeOS/core/shared/errors';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError } from '@lifeos/core/shared/errors';
 import { EmailAccount } from '../entities/EmailAccount';
 
 /**

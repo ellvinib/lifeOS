@@ -1,278 +1,341 @@
-import type { EventBus } from '../events';
-
-import type { IModule, ModuleContext } from './IModule';
-import { ModuleState } from './IModule';
-import type { ModuleRegistry } from './ModuleRegistry';
-
-/**
- * Logger interface for module loader
- */
-interface Logger {
-  info: (message: string, meta?: Record<string, unknown>) => void;
-  warn: (message: string, meta?: Record<string, unknown>) => void;
-  error: (message: string, meta?: Record<string, unknown>) => void;
-  debug: (message: string, meta?: Record<string, unknown>) => void;
-}
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { IModule, ModuleContext, ModuleMetadata } from './IModule';
+import { ModuleRegistry } from './ModuleRegistry';
+import { Result } from '../shared/result';
+import { BaseError, ValidationError, ModuleError } from '../shared/errors';
 
 /**
- * Module loader configuration
- */
-export interface ModuleLoaderConfig {
-  /**
-   * Event bus instance
-   */
-  eventBus: EventBus;
-
-  /**
-   * Logger instance
-   */
-  logger: Logger;
-
-  /**
-   * Module configurations
-   */
-  moduleConfigs?: Record<string, Record<string, unknown>>;
-
-  /**
-   * Database connection (optional)
-   */
-  database?: unknown;
-}
-
-/**
- * Module loader handles loading and initializing modules.
- * Implements the Factory pattern for creating module instances.
+ * Module Loader
  *
- * Features:
- * - Load modules in dependency order
- * - Initialize modules with context
- * - Handle initialization errors
- * - Graceful shutdown
+ * Discovers, loads, and initializes modules from the filesystem.
+ *
+ * Process:
+ * 1. Scan modules directory
+ * 2. Read module.json for each module
+ * 3. Validate metadata
+ * 4. Import module class
+ * 5. Register with ModuleRegistry
+ * 6. Initialize module
+ * 7. Subscribe to events
+ *
+ * Design Principles:
+ * - Fail fast: Invalid modules prevent startup
+ * - Dependency ordering: Load dependencies first
+ * - Error isolation: One module error doesn't crash all
  */
 export class ModuleLoader {
-  constructor(
-    private registry: ModuleRegistry,
-    private config: ModuleLoaderConfig
-  ) {}
+  private registry: ModuleRegistry;
 
-  /**
-   * Load and register a module.
-   *
-   * @param module - Module to load
-   * @throws Error if module dependencies not met
-   */
-  async load(module: IModule): Promise<void> {
-    const name = module.manifest.name;
-
-    this.config.logger.info(`Loading module: ${name}`);
-
-    // Register module
-    this.registry.register(module);
-
-    // Validate dependencies
-    const missingDeps = this.registry.validateDependencies(name);
-    if (missingDeps.length > 0) {
-      const error = new Error(
-        `Module ${name} has missing dependencies: ${missingDeps.join(', ')}`
-      );
-      this.registry.updateState(name, ModuleState.ERROR, error);
-      throw error;
-    }
-
-    this.config.logger.info(`Module loaded: ${name}`);
+  constructor() {
+    this.registry = ModuleRegistry.getInstance();
   }
 
   /**
-   * Load multiple modules.
+   * Load all modules from directory
    *
-   * @param modules - Array of modules to load
+   * @param modulesPath Path to modules directory
+   * @param context Module context for initialization
+   * @returns Result with loaded module names or error
    */
-  async loadAll(modules: IModule[]): Promise<void> {
-    for (const module of modules) {
-      await this.load(module);
-    }
-  }
-
-  /**
-   * Initialize a single module.
-   *
-   * @param name - Module name
-   */
-  async initialize(name: string): Promise<void> {
-    const module = this.registry.get(name);
-    if (!module) {
-      throw new Error(`Module ${name} not found in registry`);
-    }
-
-    this.config.logger.info(`Initializing module: ${name}`);
-    this.registry.updateState(name, ModuleState.INITIALIZING);
-
+  public async loadAll(
+    modulesPath: string,
+    context: ModuleContext
+  ): Promise<Result<string[], BaseError>> {
     try {
-      // Create module context
-      const context = this.createModuleContext(module);
+      // Step 1: Discover modules
+      const discoveryResult = await this.discoverModules(modulesPath);
+      if (discoveryResult.isFail()) {
+        return Result.fail(discoveryResult.error);
+      }
+
+      const moduleConfigs = discoveryResult.value;
+
+      // Step 2: Sort by dependencies (topological sort)
+      const sortedConfigs = this.sortByDependencies(moduleConfigs);
+
+      // Step 3: Load and initialize each module
+      const loadedModules: string[] = [];
+      const errors: BaseError[] = [];
+
+      for (const config of sortedConfigs) {
+        const loadResult = await this.loadModule(config, context);
+
+        if (loadResult.isOk()) {
+          loadedModules.push(config.metadata.name);
+        } else {
+          errors.push(loadResult.error);
+          // Continue loading other modules (fail gracefully)
+        }
+      }
+
+      if (errors.length > 0) {
+        return Result.fail(
+          new ValidationError(
+            `Failed to load ${errors.length} module(s): ${errors.map((e) => e.message).join(', ')}`,
+            errors.map((e, i) => ({
+              field: `module_${i}`,
+              message: e.message,
+            }))
+          )
+        );
+      }
+
+      return Result.ok(loadedModules);
+    } catch (error) {
+      return Result.fail(
+        new ModuleError(
+          'Failed to load modules',
+          'MODULE_LOAD_ERROR',
+          500,
+          {},
+          error instanceof Error ? error : undefined
+        )
+      );
+    }
+  }
+
+  /**
+   * Load single module
+   *
+   * @param modulePath Path to module directory
+   * @param context Module context for initialization
+   * @returns Result with module name or error
+   */
+  public async loadModule(
+    config: ModuleConfig,
+    context: ModuleContext
+  ): Promise<Result<string, BaseError>> {
+    try {
+      const { modulePath, metadata } = config;
+
+      // Import module class
+      const moduleMain = path.join(modulePath, metadata.main);
+      const moduleExports = await import(moduleMain);
+
+      // Find module class (should export default or named export)
+      const ModuleClass =
+        moduleExports.default || moduleExports[`${capitalize(metadata.name)}Module`];
+
+      if (!ModuleClass) {
+        return Result.fail(
+          new ValidationError(
+            `Module "${metadata.name}" does not export a module class`,
+            [{ field: 'main', message: 'No default export found' }]
+          )
+        );
+      }
+
+      // Instantiate module
+      const moduleInstance: IModule = new ModuleClass();
+
+      // Register module
+      const registerResult = this.registry.register(moduleInstance, metadata);
+      if (registerResult.isFail()) {
+        return Result.fail(registerResult.error);
+      }
+
+      // Update state to initializing
+      this.registry.updateState(metadata.name, 'initializing');
 
       // Initialize module
-      await module.initialize(context);
+      await moduleInstance.initialize(context);
 
-      // Register event handlers
-      this.registerEventHandlers(module);
-
-      // Mark as ready
-      this.registry.updateState(name, ModuleState.READY);
-      this.config.logger.info(`Module initialized: ${name}`);
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      this.config.logger.error(`Failed to initialize module ${name}:`, {
-        error: err.message,
-      });
-      this.registry.updateState(name, ModuleState.ERROR, err);
-      throw err;
-    }
-  }
-
-  /**
-   * Initialize all loaded modules in dependency order.
-   */
-  async initializeAll(): Promise<void> {
-    this.config.logger.info('Initializing all modules...');
-
-    // Get initialization order (respects dependencies)
-    const order = this.registry.getInitializationOrder();
-
-    this.config.logger.info(`Initialization order: ${order.join(' -> ')}`);
-
-    // Initialize modules in order
-    for (const name of order) {
-      await this.initialize(name);
-    }
-
-    this.config.logger.info('All modules initialized');
-  }
-
-  /**
-   * Shutdown a single module.
-   *
-   * @param name - Module name
-   */
-  async shutdown(name: string): Promise<void> {
-    const module = this.registry.get(name);
-    if (!module) {
-      throw new Error(`Module ${name} not found`);
-    }
-
-    this.config.logger.info(`Shutting down module: ${name}`);
-    this.registry.updateState(name, ModuleState.SHUTTING_DOWN);
-
-    try {
-      await module.shutdown();
-      this.registry.updateState(name, ModuleState.SHUTDOWN);
-      this.config.logger.info(`Module shut down: ${name}`);
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      this.config.logger.error(`Error shutting down module ${name}:`, {
-        error: err.message,
-      });
-      throw err;
-    }
-  }
-
-  /**
-   * Shutdown all modules in reverse initialization order.
-   */
-  async shutdownAll(): Promise<void> {
-    this.config.logger.info('Shutting down all modules...');
-
-    // Shutdown in reverse order
-    const order = this.registry.getInitializationOrder().reverse();
-
-    for (const name of order) {
-      try {
-        await this.shutdown(name);
-      } catch (error) {
-        // Log error but continue shutting down other modules
-        this.config.logger.error(`Error during shutdown of ${name}, continuing...`);
+      // Subscribe to events
+      const eventHandlers = moduleInstance.getEventHandlers();
+      if (eventHandlers && context.eventBus) {
+        for (const [eventType, handler] of Object.entries(eventHandlers)) {
+          await context.eventBus.subscribe(eventType, handler);
+        }
       }
-    }
 
-    this.config.logger.info('All modules shut down');
-  }
+      // Update state to initialized
+      this.registry.updateState(metadata.name, 'initialized');
 
-  /**
-   * Create module context with access to core services.
-   */
-  private createModuleContext(module: IModule): ModuleContext {
-    const moduleName = module.manifest.name;
+      return Result.ok(metadata.name);
+    } catch (error) {
+      // Update state to error
+      if (config.metadata) {
+        this.registry.updateState(config.metadata.name, 'error');
+      }
 
-    // Create scoped logger for this module
-    const logger: Logger = {
-      info: (msg, meta) =>
-        this.config.logger.info(`[${moduleName}] ${msg}`, meta),
-      warn: (msg, meta) =>
-        this.config.logger.warn(`[${moduleName}] ${msg}`, meta),
-      error: (msg, meta) =>
-        this.config.logger.error(`[${moduleName}] ${msg}`, meta),
-      debug: (msg, meta) =>
-        this.config.logger.debug(`[${moduleName}] ${msg}`, meta),
-    };
-
-    // Create context
-    const context: ModuleContext = {
-      eventBus: {
-        publish: (event) => this.config.eventBus.publish(event),
-        subscribe: (eventType, handler, priority) =>
-          this.config.eventBus.subscribe(eventType, handler, moduleName, priority),
-        unsubscribe: (id) => this.config.eventBus.unsubscribe(id),
-      },
-      logger,
-      config: this.config.moduleConfigs?.[moduleName] ?? {},
-      database: this.config.database,
-    };
-
-    return context;
-  }
-
-  /**
-   * Register event handlers from module.
-   */
-  private registerEventHandlers(module: IModule): void {
-    const handlers = module.getEventHandlers();
-    const moduleName = module.manifest.name;
-
-    for (const [eventType, handler] of Object.entries(handlers)) {
-      this.config.eventBus.subscribe(eventType, handler, moduleName);
-      this.config.logger.debug(
-        `Registered event handler for ${eventType} in module ${moduleName}`
+      return Result.fail(
+        new ModuleError(
+          `Failed to load module: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          'MODULE_LOAD_ERROR',
+          500,
+          {},
+          error instanceof Error ? error : undefined
+        )
       );
     }
   }
 
   /**
-   * Health check all modules.
+   * Shutdown all modules
+   *
+   * @returns Result with shutdown module names or error
    */
-  async healthCheck(): Promise<Record<string, { healthy: boolean; message?: string }>> {
-    const results: Record<string, { healthy: boolean; message?: string }> = {};
+  public async shutdownAll(): Promise<Result<string[], BaseError>> {
+    const modules = this.registry.getAllModules();
+    const shutdownModules: string[] = [];
+    const errors: BaseError[] = [];
 
-    for (const module of this.registry.getAll()) {
-      const name = module.manifest.name;
+    // Shutdown in reverse order (dependencies last)
+    for (const module of modules.reverse()) {
       try {
-        if (module.healthCheck) {
-          results[name] = await module.healthCheck();
-        } else {
-          // Default: healthy if module is in READY state
-          const info = this.registry.getInfo(name);
-          results[name] = {
-            healthy: info?.state === ModuleState.READY,
-            message: info?.state === ModuleState.READY ? 'OK' : `State: ${info?.state}`,
-          };
-        }
+        this.registry.updateState(module.name, 'shutting-down');
+        await module.shutdown();
+        this.registry.updateState(module.name, 'shutdown');
+        shutdownModules.push(module.name);
       } catch (error) {
-        results[name] = {
-          healthy: false,
-          message: error instanceof Error ? error.message : String(error),
-        };
+        errors.push(
+          new ModuleError(
+            `Failed to shutdown module "${module.name}"`,
+            'MODULE_SHUTDOWN_ERROR',
+            500,
+            {},
+            error instanceof Error ? error : undefined
+          )
+        );
       }
     }
 
-    return results;
+    if (errors.length > 0) {
+      return Result.fail(
+        new ValidationError(
+          `Failed to shutdown ${errors.length} module(s)`,
+          errors.map((e, i) => ({
+            field: `module_${i}`,
+            message: e.message,
+          }))
+        )
+      );
+    }
+
+    return Result.ok(shutdownModules);
   }
+
+  /**
+   * Discover modules in directory
+   *
+   * @param modulesPath Path to modules directory
+   * @returns Array of module configurations
+   */
+  private async discoverModules(
+    modulesPath: string
+  ): Promise<Result<ModuleConfig[], BaseError>> {
+    try {
+      const entries = await fs.readdir(modulesPath, { withFileTypes: true });
+      const modules: ModuleConfig[] = [];
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+
+        const modulePath = path.join(modulesPath, entry.name);
+        const metadataPath = path.join(modulePath, 'module.json');
+
+        // Check if module.json exists
+        try {
+          await fs.access(metadataPath);
+        } catch {
+          // Skip directories without module.json
+          continue;
+        }
+
+        // Read and parse module.json
+        const metadataContent = await fs.readFile(metadataPath, 'utf-8');
+        const metadata: ModuleMetadata = JSON.parse(metadataContent);
+
+        // Validate metadata
+        const validationResult = this.validateMetadata(metadata);
+        if (validationResult.isFail()) {
+          return Result.fail(validationResult.error);
+        }
+
+        modules.push({ modulePath, metadata });
+      }
+
+      return Result.ok(modules);
+    } catch (error) {
+      return Result.fail(
+        new ModuleError(
+          'Failed to discover modules',
+          'MODULE_DISCOVERY_ERROR',
+          500,
+          {},
+          error instanceof Error ? error : undefined
+        )
+      );
+    }
+  }
+
+  /**
+   * Validate module metadata
+   *
+   * @param metadata Module metadata
+   * @returns Result with success or validation error
+   */
+  private validateMetadata(metadata: ModuleMetadata): Result<void, BaseError> {
+    const errors: Array<{ field: string; message: string }> = [];
+
+    if (!metadata.name || metadata.name.trim().length === 0) {
+      errors.push({ field: 'name', message: 'Module name is required' });
+    }
+
+    if (!metadata.version || !/^\d+\.\d+\.\d+/.test(metadata.version)) {
+      errors.push({ field: 'version', message: 'Valid semantic version is required' });
+    }
+
+    if (!metadata.main || metadata.main.trim().length === 0) {
+      errors.push({ field: 'main', message: 'Main entry point is required' });
+    }
+
+    if (errors.length > 0) {
+      return Result.fail(
+        new ValidationError(
+          `Invalid module metadata for "${metadata.name || 'unknown'}"`,
+          errors
+        )
+      );
+    }
+
+    return Result.ok(undefined);
+  }
+
+  /**
+   * Sort modules by dependencies (topological sort)
+   *
+   * @param modules Module configurations
+   * @returns Sorted array (dependencies first)
+   */
+  private sortByDependencies(modules: ModuleConfig[]): ModuleConfig[] {
+    // Simple implementation: core modules first, then others
+    // TODO: Implement full topological sort based on dependencies
+    return modules.sort((a, b) => {
+      const aIsCore = a.metadata.name === 'core';
+      const bIsCore = b.metadata.name === 'core';
+
+      if (aIsCore && !bIsCore) return -1;
+      if (!aIsCore && bIsCore) return 1;
+      return 0;
+    });
+  }
+}
+
+/**
+ * Module Configuration
+ *
+ * Internal representation of discovered module
+ */
+interface ModuleConfig {
+  modulePath: string;
+  metadata: ModuleMetadata;
+}
+
+/**
+ * Capitalize first letter
+ */
+function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }

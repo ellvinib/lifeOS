@@ -2,10 +2,10 @@ import { PrismaClient } from '@prisma/client';
 import { IEmailAccountRepository } from '../../domain/interfaces/IEmailAccountRepository';
 import { EmailAccount } from '../../domain/entities/EmailAccount';
 import { EmailProvider } from '../../domain/value-objects/EmailProvider';
-import { Result } from '@lifeOS/core/shared/result/Result';
-import { BaseError } from '@lifeOS/core/shared/errors/BaseError';
-import { NotFoundError } from '@lifeOS/core/shared/errors/NotFoundError';
-import { DatabaseError } from '@lifeOS/core/shared/errors/DatabaseError';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError } from '@lifeos/core/shared/errors';
+import { NotFoundError } from '@lifeos/core/shared/errors';
+import { DatabaseError } from '@lifeos/core/shared/errors';
 import { EmailAccountPrismaMapper } from '../mappers/EmailAccountPrismaMapper';
 
 /**
@@ -43,15 +43,36 @@ export class EmailAccountRepository implements IEmailAccountRepository {
       return EmailAccountPrismaMapper.toDomain(prismaAccount);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to find email account by ID', error, { id })
+        new DatabaseError('Failed to find email account by ID', error as Error, { id })
       );
     }
   }
 
   /**
-   * Find account by email address
+   * Find account by email address (any user)
    */
-  async findByEmail(userId: string, email: string): Promise<Result<EmailAccount, BaseError>> {
+  async findByEmail(email: string): Promise<Result<EmailAccount, BaseError>> {
+    try {
+      const prismaAccount = await this.prisma.emailAccount.findFirst({
+        where: { email },
+      });
+
+      if (!prismaAccount) {
+        return Result.fail(new NotFoundError('EmailAccount', email));
+      }
+
+      return EmailAccountPrismaMapper.toDomain(prismaAccount);
+    } catch (error) {
+      return Result.fail(
+        new DatabaseError('Failed to find email account by email', error as Error, { email })
+      );
+    }
+  }
+
+  /**
+   * Find account by user ID and email
+   */
+  async findByUserAndEmail(userId: string, email: string): Promise<Result<EmailAccount, BaseError>> {
     try {
       const prismaAccount = await this.prisma.emailAccount.findUnique({
         where: {
@@ -69,15 +90,16 @@ export class EmailAccountRepository implements IEmailAccountRepository {
       return EmailAccountPrismaMapper.toDomain(prismaAccount);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to find email account by email', error, { userId, email })
+        new DatabaseError('Failed to find email account by user and email', error as Error, { userId, email })
       );
     }
   }
 
   /**
    * Find account by Outlook subscription ID
+   * Returns null if not found (used in webhook handlers)
    */
-  async findBySubscriptionId(subscriptionId: string): Promise<Result<EmailAccount, BaseError>> {
+  async findBySubscriptionId(subscriptionId: string): Promise<EmailAccount | null> {
     try {
       // Query using JSON field (Outlook-specific)
       const prismaAccounts = await this.prisma.emailAccount.findMany({
@@ -91,17 +113,15 @@ export class EmailAccountRepository implements IEmailAccountRepository {
       });
 
       if (prismaAccounts.length === 0) {
-        return Result.fail(new NotFoundError('EmailAccount', `subscription:${subscriptionId}`));
+        return null;
       }
 
       // Should only be one account per subscription
-      return EmailAccountPrismaMapper.toDomain(prismaAccounts[0]);
+      const result = EmailAccountPrismaMapper.toDomain(prismaAccounts[0]);
+      return result.isOk() ? result.value : null;
     } catch (error) {
-      return Result.fail(
-        new DatabaseError('Failed to find account by subscription ID', error, {
-          subscriptionId,
-        })
-      );
+      console.error('Failed to find account by subscription ID:', error);
+      return null;
     }
   }
 
@@ -134,24 +154,33 @@ export class EmailAccountRepository implements IEmailAccountRepository {
       return EmailAccountPrismaMapper.toDomainList(prismaAccounts);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to find accounts by user', error, { userId, filters })
+        new DatabaseError('Failed to find accounts by user', error as Error, { userId, filters })
       );
     }
   }
 
   /**
    * Find all active accounts (for background jobs)
+   * Returns empty array if error occurs
    */
-  async findAllActive(): Promise<Result<EmailAccount[], BaseError>> {
+  async findAllActive(filters?: { provider?: EmailProvider }): Promise<EmailAccount[]> {
     try {
+      const where: any = { isActive: true };
+
+      if (filters?.provider) {
+        where.provider = this.mapProviderToString(filters.provider);
+      }
+
       const prismaAccounts = await this.prisma.emailAccount.findMany({
-        where: { isActive: true },
+        where,
         orderBy: { createdAt: 'desc' },
       });
 
-      return EmailAccountPrismaMapper.toDomainList(prismaAccounts);
+      const result = EmailAccountPrismaMapper.toDomainList(prismaAccounts);
+      return result.isOk() ? result.value : [];
     } catch (error) {
-      return Result.fail(new DatabaseError('Failed to find all active accounts', error));
+      console.error('Failed to find all active accounts:', error);
+      return [];
     }
   }
 
@@ -169,7 +198,7 @@ export class EmailAccountRepository implements IEmailAccountRepository {
       return EmailAccountPrismaMapper.toDomain(createdAccount);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to create email account', error, {
+        new DatabaseError('Failed to create email account', error as Error, {
           accountId: account.id,
         })
       );
@@ -199,7 +228,7 @@ export class EmailAccountRepository implements IEmailAccountRepository {
       }
 
       return Result.fail(
-        new DatabaseError('Failed to update email account', error, {
+        new DatabaseError('Failed to update email account', error as Error, {
           accountId: account.id,
         })
       );
@@ -222,14 +251,15 @@ export class EmailAccountRepository implements IEmailAccountRepository {
         return Result.fail(new NotFoundError('EmailAccount', id));
       }
 
-      return Result.fail(new DatabaseError('Failed to delete email account', error, { id }));
+      return Result.fail(new DatabaseError('Failed to delete email account', error as Error, { id }));
     }
   }
 
   /**
    * Check if account exists
+   * Returns false if error occurs
    */
-  async exists(userId: string, email: string): Promise<Result<boolean, BaseError>> {
+  async exists(userId: string, email: string): Promise<boolean> {
     try {
       const count = await this.prisma.emailAccount.count({
         where: {
@@ -238,11 +268,10 @@ export class EmailAccountRepository implements IEmailAccountRepository {
         },
       });
 
-      return Result.ok(count > 0);
+      return count > 0;
     } catch (error) {
-      return Result.fail(
-        new DatabaseError('Failed to check if account exists', error, { userId, email })
-      );
+      console.error('Failed to check if account exists:', error);
+      return false;
     }
   }
 

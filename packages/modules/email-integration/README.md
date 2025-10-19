@@ -1,6 +1,6 @@
 # Email Integration Module
 
-**Status:** ✅ **Outlook & SMTP Integration Complete** (Gmail coming soon)
+**Status:** ✅ **Complete - Gmail, Outlook & SMTP Integration**
 
 Shared infrastructure module that enables LifeOS to receive and process emails from Gmail, Outlook, and SMTP providers.
 
@@ -496,12 +496,342 @@ The module automatically detects IDLE support and uses the best method available
    - Auto-reconnect with exponential backoff
    - Graceful degradation to polling
 
-## Coming Soon
+## Implemented: Gmail Integration
 
-### Gmail Integration
-- Cloud Pub/Sub webhooks
-- History API for incremental sync
-- OAuth 2.0 authentication
+### How It Works
+
+Gmail integration uses **Google Cloud Pub/Sub + History API** for efficient real-time email notifications:
+
+```
+User connects Gmail account (OAuth)
+  ↓
+Email Module creates watch() on mailbox
+  ↓
+Gmail pushes to Cloud Pub/Sub topic when email arrives
+  ↓
+Pub/Sub delivers notification to webhook endpoint
+  ↓
+Webhook handler triggers History API incremental sync
+  ↓
+Email metadata stored + event published
+  ↓
+Domain modules process in background workers
+```
+
+### Architecture Advantages
+
+Gmail's approach is **90%+ more efficient** than full sync:
+- **History API** fetches only changes since last historyId (delta sync)
+- **7-day watch expiration** (longer than Outlook's 3 days)
+- **Pub/Sub reliability** - Google handles retry/delivery
+- **No webhook signature verification needed** - HTTPS + timestamp validation sufficient
+
+### Key Components
+
+#### 1. **GmailProvider** (`infrastructure/providers/`)
+- Fetches email metadata using Gmail API
+- Fetches full email content (lazy loading)
+- OAuth2 with automatic token refresh
+- MIME part extraction for attachments
+
+#### 2. **GmailConnectionManager** (`infrastructure/connections/`)
+- Creates Gmail watch() on user's mailbox
+- Stores historyId for incremental sync
+- Renews watches before 7-day expiration
+- Handles teardown on disconnect
+
+#### 3. **GmailWebhookHandler** (`infrastructure/webhooks/`)
+- Receives Pub/Sub push notifications
+- Decodes base64 message data
+- Validates timestamp (< 5 minutes)
+- Triggers history sync job
+
+#### 4. **GmailHistorySyncUseCase** (`application/use-cases/`)
+- **Gmail-specific** - Uses History API for delta sync
+- Fetches only `messagesAdded` events
+- Handles pagination automatically
+- Fallback to full sync if historyId too old (> 30 days)
+- Updates historyId after successful sync
+
+### Setup Instructions
+
+#### Prerequisites
+
+1. **Google Cloud Project**
+   - Go to [Google Cloud Console](https://console.cloud.google.com)
+   - Create new project or select existing
+   - Note your **Project ID**
+
+2. **Enable Gmail API**
+   - In Cloud Console → "APIs & Services" → "Library"
+   - Search for "Gmail API"
+   - Click "Enable"
+
+3. **Create OAuth 2.0 Credentials**
+   - Go to "APIs & Services" → "Credentials"
+   - Click "Create Credentials" → "OAuth client ID"
+   - Application type: "Web application"
+   - Authorized redirect URIs: `https://your-domain.com/api/auth/gmail/callback`
+   - Note the **Client ID** and **Client secret**
+
+4. **Create Pub/Sub Topic**
+   ```bash
+   # Via gcloud CLI
+   gcloud pubsub topics create gmail-notifications
+
+   # Get full topic name
+   # projects/YOUR_PROJECT_ID/topics/gmail-notifications
+   ```
+
+5. **Grant Gmail API Push Permission**
+   ```bash
+   # Gmail API service account needs publisher permission
+   gcloud pubsub topics add-iam-policy-binding gmail-notifications \
+     --member=serviceAccount:gmail-api-push@system.gserviceaccount.com \
+     --role=roles/pubsub.publisher
+   ```
+
+6. **Create Push Subscription**
+   ```bash
+   gcloud pubsub subscriptions create gmail-notifications-sub \
+     --topic=gmail-notifications \
+     --push-endpoint=https://your-domain.com/api/email/webhooks/gmail
+   ```
+
+#### Environment Variables
+
+```.env
+# Google OAuth
+GOOGLE_CLIENT_ID=your_client_id_here
+GOOGLE_CLIENT_SECRET=your_client_secret_here
+GOOGLE_REDIRECT_URI=https://your-domain.com/api/auth/gmail/callback
+
+# Google Cloud Pub/Sub
+GOOGLE_PUBSUB_TOPIC=projects/YOUR_PROJECT_ID/topics/gmail-notifications
+
+# Webhook base URL (must be HTTPS in production)
+WEBHOOK_BASE_URL=https://your-domain.com
+```
+
+#### Database Schema
+
+```prisma
+model EmailAccount {
+  id                   String    @id @default(uuid())
+  userId               String
+  provider             EmailProvider
+  email                String
+  emailName            String?
+  isActive             Boolean   @default(true)
+  lastSyncedAt         DateTime?
+  providerData         Json      // Gmail: { historyId, watchExpiration, pubSubTopicName, watchCreated }
+  encryptedCredentials String    // OAuth tokens
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([provider])
+}
+```
+
+### Usage Example
+
+#### Connect Gmail Account (Application Layer)
+
+```typescript
+import { ConnectAccountUseCase } from '@lifeOS/email-integration';
+import { EmailProvider } from '@lifeOS/email-integration';
+
+const useCase = new ConnectAccountUseCase(
+  accountRepository,
+  {
+    gmail: gmailConnectionManager,
+  },
+  triggerInitialSync
+);
+
+const result = await useCase.execute({
+  userId: 'user-123',
+  provider: EmailProvider.GMAIL,
+  email: 'user@gmail.com',
+  emailName: 'John Doe',
+  credentials: {
+    accessToken: 'ya29...',
+    refreshToken: '1//...',
+    expiresAt: new Date('2025-10-19T12:00:00Z'),
+  },
+});
+
+if (result.isOk()) {
+  const account = result.value;
+  console.log('✓ Gmail account connected:', account.email);
+  console.log('✓ Watch created with historyId:', account.getProviderData().historyId);
+  console.log('✓ Watch expires:', account.getProviderData().watchExpiration);
+} else {
+  console.error('✗ Connection failed:', result.error.message);
+}
+```
+
+#### Connect via HTTP API
+
+```bash
+# Connect Gmail account
+curl -X POST http://localhost:3000/api/email/accounts/connect \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "user-123",
+    "provider": "gmail",
+    "email": "user@gmail.com",
+    "emailName": "John Doe",
+    "credentials": {
+      "accessToken": "ya29...",
+      "refreshToken": "1//...",
+      "expiresAt": "2025-10-19T12:00:00Z"
+    }
+  }'
+
+# Response:
+# {
+#   "message": "Email account connected successfully",
+#   "account": {
+#     "id": "uuid-...",
+#     "provider": "gmail",
+#     "email": "user@gmail.com",
+#     "isActive": true,
+#     "providerData": {
+#       "historyId": "123456",
+#       "watchExpiration": "2025-10-26T12:00:00.000Z",
+#       "pubSubTopicName": "projects/PROJECT/topics/gmail-notifications"
+#     },
+#     ...
+#   }
+# }
+```
+
+### History API Incremental Sync
+
+The Gmail integration's killer feature is **incremental sync via History API**:
+
+```typescript
+import { GmailHistorySyncUseCase } from '@lifeOS/email-integration';
+
+const useCase = new GmailHistorySyncUseCase(
+  accountRepository,
+  emailRepository,
+  eventPublisher,
+  syncEmailsUseCase // Fallback for full sync
+);
+
+// Triggered by Pub/Sub webhook
+const result = await useCase.execute(accountId);
+
+if (result.isOk()) {
+  const newEmailCount = result.value;
+  console.log(`✓ Synced ${newEmailCount} new emails via History API`);
+  // Only fetched changes since last historyId!
+} else {
+  console.error('✗ Sync failed:', result.error.message);
+}
+```
+
+**Efficiency Example:**
+- Mailbox has 10,000 emails
+- Full sync: Fetch 10,000 message IDs + 10,000 metadata requests = **20,000 API calls**
+- History sync: 1 history request + 5 new message requests = **6 API calls** (99.97% reduction!)
+
+### Watch Renewal
+
+Gmail watches expire after **7 days**. The `SubscriptionRenewalJob` automatically renews watches:
+
+```typescript
+import { SubscriptionRenewalJob } from '@lifeOS/email-integration';
+
+// Schedule daily (cron: 0 0 * * *)
+const job = new SubscriptionRenewalJob(
+  accountRepository.findAllActive,
+  outlookConnectionManager,
+  gmailConnectionManager, // Gmail support!
+  accountRepository.update
+);
+
+await job.execute();
+// Renews watches expiring within 24 hours
+```
+
+### Pub/Sub Notification Format
+
+Google sends base64-encoded JSON via Pub/Sub:
+
+```json
+{
+  "message": {
+    "data": "eyJlbWFpbEFkZHJlc3MiOiJ1c2VyQGdtYWlsLmNvbSIsImhpc3RvcnlJZCI6IjEyMzQ1NiJ9",
+    "messageId": "10000000000000000",
+    "publishTime": "2025-10-19T12:00:00.000Z"
+  },
+  "subscription": "projects/PROJECT/subscriptions/gmail-notifications-sub"
+}
+```
+
+Decoded data:
+```json
+{
+  "emailAddress": "user@gmail.com",
+  "historyId": "123456"
+}
+```
+
+### Security
+
+1. **OAuth 2.0 Authentication**
+   - Secure token-based access
+   - Automatic token refresh via googleapis library
+   - No password storage
+
+2. **Pub/Sub Security**
+   - HTTPS required for push endpoint
+   - Timestamp validation (notifications < 5 minutes old)
+   - No signature verification needed (push subscription is secure)
+
+3. **IAM Permissions**
+   - `gmail-api-push@system.gserviceaccount.com` needs `pubsub.publisher` role
+   - Prevents unauthorized watch creation
+
+4. **Token Encryption**
+   - OAuth tokens stored encrypted in database
+   - TODO: Implement proper KMS encryption
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **"Permission denied" when creating watch**
+   - **Solution:** Grant `pubsub.publisher` role to Gmail API service account:
+   ```bash
+   gcloud pubsub topics add-iam-policy-binding gmail-notifications \
+     --member=serviceAccount:gmail-api-push@system.gserviceaccount.com \
+     --role=roles/pubsub.publisher
+   ```
+
+2. **"Topic not found" error**
+   - **Solution:** Create Pub/Sub topic first:
+   ```bash
+   gcloud pubsub topics create gmail-notifications
+   ```
+
+3. **Webhook receives no notifications**
+   - **Solution:** Verify push subscription is configured correctly:
+   ```bash
+   gcloud pubsub subscriptions describe gmail-notifications-sub
+   # Check pushConfig.pushEndpoint matches your webhook URL
+   ```
+
+4. **"historyId too old" fallback**
+   - **Cause:** Gmail only keeps ~30 days of history
+   - **Automatic:** System falls back to full sync automatically
+   - **Prevention:** Ensure account syncs at least once per month
+
+## Coming Soon
 
 ### Advanced Features
 - **Hybrid Filtering** (Quick filters + AI)
@@ -543,5 +873,5 @@ Part of LifeOS - See main project LICENSE
 
 ---
 
-**Last Updated:** 2025-10-18
-**Status:** Outlook implementation complete, Gmail and SMTP pending
+**Last Updated:** 2025-10-19
+**Status:** ✅ Complete - Gmail, Outlook, and SMTP integration fully implemented

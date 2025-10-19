@@ -1,9 +1,9 @@
 import { EmailAccount } from '../../domain/entities/EmailAccount';
 import { IEmailConnectionManager } from '../../domain/interfaces/IEmailConnectionManager';
-import { Result } from '@lifeOS/core/shared/result/Result';
-import { BaseError } from '@lifeOS/core/shared/errors/BaseError';
-import { ExternalServiceError } from '@lifeOS/core/shared/errors/ExternalServiceError';
-import { ValidationError } from '@lifeOS/core/shared/errors/ValidationError';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError } from '@lifeos/core/shared/errors';
+import { ExternalServiceError } from '@lifeos/core/shared/errors';
+import { ValidationError } from '@lifeos/core/shared/errors';
 import { ImapFlow } from 'imapflow';
 
 /**

@@ -1,26 +1,15 @@
-import { connect as imapConnect, Connection, ImapFlow } from 'imapflow';
+import { ImapFlow } from 'imapflow';
 import { simpleParser, ParsedMail } from 'mailparser';
-import { Result } from '@lifeOS/core/shared/result/Result';
-import { BaseError } from '@lifeOS/core/shared/errors/BaseError';
-import { ExternalServiceError } from '@lifeOS/core/shared/errors/ExternalServiceError';
-import { ValidationError } from '@lifeOS/core/shared/errors/ValidationError';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError } from '@lifeos/core/shared/errors';
+import { ExternalServiceError } from '@lifeos/core/shared/errors';
+import { ValidationError } from '@lifeos/core/shared/errors';
 import {
   IEmailProvider,
   EmailMetadata,
   EmailContent,
 } from '../../domain/interfaces/IEmailProvider';
-
-/**
- * SMTP Credentials (stored encrypted)
- */
-export interface SmtpCredentials {
-  username: string;
-  password: string;
-  imapHost: string;
-  imapPort: number;
-  smtpHost?: string;
-  smtpPort?: number;
-}
+import { SmtpCredentials } from '../../application/dtos/EmailAccountDTO';
 
 /**
  * SMTP/IMAP Provider
@@ -319,19 +308,29 @@ export class SmtpProvider implements IEmailProvider {
    * Map parsed MIME message to EmailContent
    */
   private mapToEmailContent(messageId: string, parsed: ParsedMail): EmailContent {
-    const from = parsed.from?.value?.[0];
+    // Handle from address (can be single object or array)
+    const fromArray = Array.isArray(parsed.from) ? parsed.from : parsed.from?.value || [];
+    const from = fromArray[0];
     const fromAddress = from?.address || 'unknown';
     const fromName = from?.name || null;
 
-    const to = (parsed.to?.value || []).map((r: any) => r.address);
-    const cc = (parsed.cc?.value || []).map((r: any) => r.address);
-    const bcc = (parsed.bcc?.value || []).map((r: any) => r.address);
+    // Handle to addresses
+    const toArray = Array.isArray(parsed.to) ? parsed.to : parsed.to?.value || [];
+    const to = toArray.map((r: any) => r.address);
+
+    // Handle cc addresses
+    const ccArray = Array.isArray(parsed.cc) ? parsed.cc : parsed.cc?.value || [];
+    const cc = ccArray.map((r: any) => r.address);
+
+    // Handle bcc addresses
+    const bccArray = Array.isArray(parsed.bcc) ? parsed.bcc : parsed.bcc?.value || [];
+    const bcc = bccArray.map((r: any) => r.address);
 
     const subject = parsed.subject || '(no subject)';
     const bodyText = parsed.text || '';
     const bodyHtml = parsed.html || undefined;
 
-    const attachments = (parsed.attachments || []).map((att) => ({
+    const attachments = (parsed.attachments || []).map((att: any) => ({
       id: att.contentId || att.checksum || '',
       filename: att.filename || 'attachment',
       contentType: att.contentType || 'application/octet-stream',

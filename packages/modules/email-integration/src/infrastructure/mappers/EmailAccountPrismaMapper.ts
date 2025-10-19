@@ -1,9 +1,8 @@
 import { EmailAccount as PrismaEmailAccount, EmailProvider as PrismaEmailProvider } from '@prisma/client';
 import { EmailAccount } from '../../domain/entities/EmailAccount';
 import { EmailProvider } from '../../domain/value-objects/EmailProvider';
-import { EmailAddress } from '../../domain/value-objects/EmailAddress';
-import { Result } from '@lifeOS/core/shared/result/Result';
-import { ValidationError } from '@lifeOS/core/shared/errors/ValidationError';
+import { Result } from '@lifeos/core/shared/result';
+import { ValidationError } from '@lifeos/core/shared/errors';
 
 /**
  * EmailAccount Prisma Mapper
@@ -23,16 +22,6 @@ export class EmailAccountPrismaMapper {
    */
   static toDomain(prismaAccount: PrismaEmailAccount): Result<EmailAccount, ValidationError> {
     try {
-      // Parse email address
-      const emailAddressResult = EmailAddress.create(
-        prismaAccount.email,
-        prismaAccount.emailName
-      );
-
-      if (emailAddressResult.isFail()) {
-        return Result.fail(emailAddressResult.error);
-      }
-
       // Map provider enum
       const provider = this.mapProviderToDomain(prismaAccount.provider);
 
@@ -42,12 +31,13 @@ export class EmailAccountPrismaMapper {
           ? JSON.parse(prismaAccount.providerData)
           : prismaAccount.providerData;
 
-      // Create domain entity
-      const account = EmailAccount.create({
+      // Reconstruct domain entity from persistence
+      const account = EmailAccount.fromPersistence({
         id: prismaAccount.id,
         userId: prismaAccount.userId,
         provider,
-        emailAddress: emailAddressResult.value,
+        email: prismaAccount.email,
+        emailName: prismaAccount.emailName,
         isActive: prismaAccount.isActive,
         lastSyncedAt: prismaAccount.lastSyncedAt,
         providerData,

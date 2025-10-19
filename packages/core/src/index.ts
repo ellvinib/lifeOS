@@ -1,22 +1,23 @@
 /**
- * @lifeos/core
+ * LifeOS Core
  *
- * Core framework for LifeOS providing:
- * - Event-driven architecture (Event Bus)
- * - Plugin system (Module System)
- * - Shared domain entities and value objects
- * - Error handling infrastructure
- * - Result type for functional error handling
+ * Core framework for the LifeOS modular monolith.
+ * Provides:
+ * - Module system (plugin architecture)
+ * - Event bus (event-driven communication)
+ * - Job queue (background processing)
+ * - Shared utilities (Result type, errors, etc.)
  */
-
-// Domain
-export * from './domain';
-
-// Events
-export * from './events';
 
 // Module System
 export * from './module-system';
 
-// Shared utilities
-export * from './shared';
+// Event Bus
+export * from './events';
+
+// Job Queue
+export * from './jobs';
+
+// Shared Utilities
+export * from './shared/result';
+export * from './shared/errors';

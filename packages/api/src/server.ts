@@ -1,258 +1,281 @@
-import 'express-async-errors'; // Must be first! Handles async errors in routes
-import express from 'express';
-import http from 'http';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
-import { EventBus, EventStore } from '@lifeos/core';
-
-import { DatabaseClient } from './infrastructure/database/DatabaseClient';
-import { TaskRepository } from './infrastructure/repositories/TaskRepository';
-import { createTaskRoutes } from './presentation/routes/taskRoutes';
-import { errorHandler, notFoundHandler } from './presentation/middleware/errorHandler';
-import { JobQueueManager } from './infrastructure/jobs';
-import { setupApolloServer } from './graphql/apollo';
-import { createRedisConnection } from './infrastructure/jobs/redis';
-import { RedisCacheService, DashboardCacheService } from './infrastructure/cache';
+import { PrismaClient } from '@prisma/client';
+import { ModuleLoader, ModuleContext } from '@lifeos/core/module-system';
+import { EventBus } from '@lifeos/core/events';
+import { BullMQAdapter } from './infrastructure/BullMQAdapter';
+import * as path from 'path';
 
 /**
- * Main server application.
+ * LifeOS API Server
  *
- * Design principles:
- * - Separation of concerns: App setup vs server start
- * - Dependency injection: Dependencies passed to routes
- * - Middleware chain: Security → Logging → Routes → Error handling
- * - Graceful shutdown: Clean up resources on exit
+ * Express server with module loading and lifecycle management.
+ *
+ * Architecture:
+ * - Module-based: Each feature is a self-contained module
+ * - Event-driven: Modules communicate via events
+ * - Background jobs: BullMQ for async processing
+ * - Clean shutdown: Graceful cleanup on SIGTERM/SIGINT
  */
+export class LifeOSServer {
+  private app: Express;
+  private prisma: PrismaClient;
+  private eventBus: EventBus;
+  private jobQueue: BullMQAdapter;
+  private moduleLoader: ModuleLoader;
+  private server: any;
 
-/**
- * Create and configure Express application.
- */
-function createApp(): express.Application {
-  const app = express();
-
-  // ========== Security Middleware ==========
-  app.use(helmet()); // Security headers
-  app.use(cors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-  }));
-
-  // ========== Body Parsing ==========
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
-
-  // ========== Compression ==========
-  app.use(compression());
-
-  // ========== Request Logging ==========
-  if (process.env.NODE_ENV !== 'test') {
-    app.use(morgan('combined'));
+  constructor() {
+    this.app = express();
+    this.prisma = new PrismaClient();
+    this.eventBus = new EventBus();
+    this.jobQueue = new BullMQAdapter(process.env.REDIS_URL || 'redis://localhost:6379');
+    this.moduleLoader = new ModuleLoader();
   }
 
-  // ========== Root Route ==========
-  app.get('/', (req, res) => {
-    const port = process.env.PORT || 3000;
-    res.json({
-      name: 'LifeOS API',
-      version: '1.0.0',
-      status: 'running',
-      timestamp: new Date().toISOString(),
-      endpoints: {
-        rest: `http://localhost:${port}/api`,
-        graphql: `http://localhost:${port}/graphql`,
-        health: `http://localhost:${port}/health`,
-      },
-      modules: {
-        tasks: `http://localhost:${port}/api/tasks`,
-        garden: `http://localhost:${port}/api/garden`,
-        // finance: `http://localhost:${port}/api/finance`, // Temporarily disabled - missing dependencies
-        calendar: `http://localhost:${port}/api/calendar/events`,
-        auth: `http://localhost:${port}/api/auth`,
-      },
-      documentation: 'https://github.com/yourusername/lifeOS',
-    });
-  });
+  /**
+   * Initialize and start server
+   */
+  async start(): Promise<void> {
+    try {
+      console.log('🚀 Starting LifeOS Server...');
 
-  // ========== Health Check ==========
-  app.get('/health', async (req, res) => {
-    const isDbHealthy = await DatabaseClient.healthCheck();
-    res.status(isDbHealthy ? 200 : 503).json({
-      status: isDbHealthy ? 'healthy' : 'unhealthy',
-      timestamp: new Date().toISOString(),
-      database: isDbHealthy ? 'connected' : 'disconnected',
-    });
-  });
+      // Step 1: Setup middleware
+      this.setupMiddleware();
 
-  // ========== API Routes ==========
-  // Initialize dependencies (in production, use DI container)
-  const eventStore = new EventStore();
-  const eventBus = new EventBus(eventStore);
+      // Step 2: Connect to database
+      await this.connectDatabase();
 
-  // Task repository
-  const taskRepository = new TaskRepository();
+      // Step 3: Load and initialize modules
+      await this.loadModules();
 
-  // Garden repositories
-  const { GardenTaskRepository } = require('./infrastructure/repositories/GardenTaskRepository');
-  const { PlantRepository } = require('./infrastructure/repositories/PlantRepository');
-  const { GardenAreaRepository } = require('./infrastructure/repositories/GardenAreaRepository');
+      // Step 4: Setup error handlers
+      this.setupErrorHandlers();
 
-  const gardenTaskRepository = new GardenTaskRepository();
-  const plantRepository = new PlantRepository();
-  const gardenAreaRepository = new GardenAreaRepository();
+      // Step 5: Start HTTP server
+      await this.startHttpServer();
 
-  // Register routes with dependencies
-  app.use('/api/tasks', createTaskRoutes(taskRepository, eventBus));
+      // Step 6: Setup graceful shutdown
+      this.setupGracefulShutdown();
 
-  // Garden routes
-  const { createGardenRoutes } = require('./presentation/routes/gardenRoutes');
-  app.use('/api/garden', createGardenRoutes(
-    gardenTaskRepository,
-    plantRepository,
-    gardenAreaRepository,
-    eventBus
-  ));
+      console.log('✅ LifeOS Server started successfully');
+    } catch (error) {
+      console.error('❌ Failed to start server:', error);
+      await this.shutdown();
+      process.exit(1);
+    }
+  }
 
-  // Finance module routes (full implementation)
-  // TODO: Fix finance module dependencies (csv-parse, multer) before uncommenting
-  // const { createFinanceRoutes } = require('../../modules/finance/src/presentation/routes');
-  // app.use('/api/finance', createFinanceRoutes(prisma, eventBus));
+  /**
+   * Setup Express middleware
+   */
+  private setupMiddleware(): void {
+    // Security
+    this.app.use(helmet());
+    this.app.use(
+      cors({
+        origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+        credentials: true,
+      })
+    );
 
-  // Calendar module routes
-  const prisma = DatabaseClient.getInstance();
-  const { createCalendarEventRoutes } = require('../../modules/calendar/src/presentation/routes');
-  app.use('/api/calendar/events', createCalendarEventRoutes(prisma, eventBus));
+    // Compression
+    this.app.use(compression());
 
-  // Authentication routes
-  const { createAuthRoutes } = require('./presentation/routes/auth.routes');
-  app.use('/api/auth', createAuthRoutes(prisma));
+    // Logging
+    if (process.env.NODE_ENV !== 'test') {
+      this.app.use(morgan('combined'));
+    }
 
-  // Note: Error handlers will be registered AFTER GraphQL middleware in startServer()
-  // This allows GraphQL routes to be registered before the catch-all 404 handler
+    // Body parsing
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  return app;
-}
-
-/**
- * Start the server.
- */
-async function startServer(): Promise<void> {
-  let jobQueueManager: JobQueueManager | null = null;
-  let redisCacheService: RedisCacheService | null = null;
-
-  try {
-    // Connect to database
-    await DatabaseClient.connect();
-
-    // Initialize shared dependencies
-    const prisma = DatabaseClient.getInstance();
-    const eventStore = new EventStore();
-    const eventBus = new EventBus(eventStore);
-
-    // Initialize Redis cache
-    const redisClient = createRedisConnection();
-    redisCacheService = new RedisCacheService(redisClient);
-    const dashboardCache = new DashboardCacheService(redisCacheService);
-    console.log('✓ Redis cache initialized');
-
-    // Initialize job queue manager
-    jobQueueManager = new JobQueueManager(prisma, eventBus);
-    await jobQueueManager.initialize();
-
-    // Create Express app
-    const app = createApp();
-
-    // Create HTTP server
-    const httpServer = http.createServer(app);
-
-    // Setup Apollo GraphQL server with cache
-    await setupApolloServer(app, httpServer, prisma, eventBus, dashboardCache);
-
-    // ========== Error Handling ==========
-    // Must be LAST! After all routes including GraphQL
-    app.use(notFoundHandler); // 404 handler
-    app.use(errorHandler);    // Global error handler
-
-    // Start HTTP server
-    const port = process.env.PORT || 3000;
-    httpServer.listen(port, () => {
-      console.log('');
-      console.log('✓ Server started successfully');
-      console.log(`✓ Listening on port ${port}`);
-      console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log('');
-      console.log(`REST API: http://localhost:${port}/api`);
-      console.log(`GraphQL: http://localhost:${port}/graphql`);
-      console.log(`Health: http://localhost:${port}/health`);
-      console.log('');
-    });
-
-    // ========== Graceful Shutdown ==========
-    const shutdown = async (signal: string): Promise<void> => {
-      console.log(`\n${signal} received, shutting down gracefully...`);
-
-      // Close HTTP server (stop accepting new connections)
-      httpServer.close(async () => {
-        console.log('✓ HTTP server closed');
-
-        try {
-          // Shutdown job queues
-          if (jobQueueManager) {
-            await jobQueueManager.shutdown();
-          }
-
-          // Disconnect Redis cache
-          if (redisCacheService) {
-            await redisCacheService.disconnect();
-            console.log('✓ Redis cache disconnected');
-          }
-
-          // Disconnect from database
-          await DatabaseClient.disconnect();
-
-          console.log('✓ Graceful shutdown complete');
-          process.exit(0);
-        } catch (error) {
-          console.error('✗ Error during shutdown:', error);
-          process.exit(1);
-        }
+    // Health check endpoint
+    this.app.get('/health', (req: Request, res: Response) => {
+      res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
       });
+    });
 
-      // Force shutdown after 10 seconds
-      setTimeout(() => {
-        console.error('✗ Forced shutdown after timeout');
-        process.exit(1);
-      }, 10000);
+    // API info endpoint
+    this.app.get('/api', (req: Request, res: Response) => {
+      res.json({
+        name: 'LifeOS API',
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+      });
+    });
+  }
+
+  /**
+   * Connect to database
+   */
+  private async connectDatabase(): Promise<void> {
+    console.log('📦 Connecting to database...');
+    await this.prisma.$connect();
+    console.log('✅ Database connected');
+  }
+
+  /**
+   * Load and initialize modules
+   */
+  private async loadModules(): Promise<void> {
+    console.log('📚 Loading modules...');
+
+    const modulesPath = path.join(__dirname, '../../modules');
+
+    const context: ModuleContext = {
+      prisma: this.prisma,
+      eventBus: this.eventBus,
+      jobQueue: this.jobQueue,
+      config: {
+        geminiApiKey: process.env.GEMINI_API_KEY,
+        mailgunSigningKey: process.env.MAILGUN_SIGNING_KEY,
+        mailgunApiKey: process.env.MAILGUN_API_KEY,
+        fileStoragePath: process.env.FILE_STORAGE_PATH || './data',
+      },
+      storagePath: process.env.FILE_STORAGE_PATH || './data',
+      env: (process.env.NODE_ENV as any) || 'development',
     };
 
-    // Handle shutdown signals
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
+    const result = await this.moduleLoader.loadAll(modulesPath, context);
 
-    // Handle uncaught errors
-    process.on('uncaughtException', (error) => {
-      console.error('UNCAUGHT EXCEPTION:', error);
-      shutdown('uncaughtException');
+    if (result.isFail()) {
+      throw new Error(`Failed to load modules: ${result.error.message}`);
+    }
+
+    const loadedModules = result.value;
+    console.log(`✅ Loaded ${loadedModules.length} modules:`, loadedModules.join(', '));
+
+    // Mount module routes
+    this.mountModuleRoutes();
+  }
+
+  /**
+   * Mount routes from all loaded modules
+   */
+  private mountModuleRoutes(): void {
+    const registry = this.moduleLoader['registry']; // Access private registry
+    const modules = registry.getAllModules();
+
+    for (const module of modules) {
+      const router = module.getRoutes();
+      if (router) {
+        const basePath = `/api/${module.name}`;
+        this.app.use(basePath, router);
+        console.log(`  📍 Mounted routes: ${basePath}`);
+      }
+    }
+  }
+
+  /**
+   * Setup error handlers
+   */
+  private setupErrorHandlers(): void {
+    // 404 handler
+    this.app.use((req: Request, res: Response) => {
+      res.status(404).json({
+        success: false,
+        error: {
+          message: 'Route not found',
+          code: 'ROUTE_NOT_FOUND',
+          path: req.path,
+        },
+      });
     });
 
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error('UNHANDLED REJECTION at:', promise, 'reason:', reason);
-      shutdown('unhandledRejection');
+    // Global error handler
+    this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+      console.error('Server error:', err);
+
+      res.status(500).json({
+        success: false,
+        error: {
+          message: process.env.NODE_ENV === 'production' 
+            ? 'Internal server error' 
+            : err.message,
+          code: 'INTERNAL_SERVER_ERROR',
+        },
+      });
     });
-  } catch (error) {
-    console.error('✗ Failed to start server:', error);
-    process.exit(1);
+  }
+
+  /**
+   * Start HTTP server
+   */
+  private async startHttpServer(): Promise<void> {
+    const port = process.env.PORT || 3000;
+
+    return new Promise((resolve) => {
+      this.server = this.app.listen(port, () => {
+        console.log(`🌐 Server listening on http://localhost:${port}`);
+        console.log(`📖 API documentation: http://localhost:${port}/api`);
+        console.log(`💚 Health check: http://localhost:${port}/health`);
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Setup graceful shutdown
+   */
+  private setupGracefulShutdown(): void {
+    const signals: NodeJS.Signals[] = ['SIGTERM', 'SIGINT'];
+
+    signals.forEach((signal) => {
+      process.on(signal, async () => {
+        console.log(`\n📛 Received ${signal}, starting graceful shutdown...`);
+        await this.shutdown();
+        process.exit(0);
+      });
+    });
+  }
+
+  /**
+   * Shutdown server gracefully
+   */
+  async shutdown(): Promise<void> {
+    console.log('🛑 Shutting down server...');
+
+    try {
+      // Step 1: Stop accepting new requests
+      if (this.server) {
+        await new Promise((resolve) => this.server.close(resolve));
+        console.log('  ✅ HTTP server closed');
+      }
+
+      // Step 2: Shutdown modules
+      console.log('  📚 Shutting down modules...');
+      await this.moduleLoader.shutdownAll();
+      console.log('  ✅ Modules shut down');
+
+      // Step 3: Close job queue
+      console.log('  💼 Closing job queue...');
+      await this.jobQueue.close();
+      console.log('  ✅ Job queue closed');
+
+      // Step 4: Disconnect from database
+      console.log('  📦 Disconnecting from database...');
+      await this.prisma.$disconnect();
+      console.log('  ✅ Database disconnected');
+
+      console.log('✅ Server shut down gracefully');
+    } catch (error) {
+      console.error('❌ Error during shutdown:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get Express app (for testing)
+   */
+  getApp(): Express {
+    return this.app;
   }
 }
-
-// Start server if this file is run directly
-if (require.main === module) {
-  startServer().catch((error) => {
-    console.error('Fatal error:', error);
-    process.exit(1);
-  });
-}
-
-// Export for testing
-export { createApp, startServer };

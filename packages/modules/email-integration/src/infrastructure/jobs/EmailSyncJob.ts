@@ -66,7 +66,7 @@ export class EmailSyncWorker {
     duration: number;
   }> {
     const startTime = Date.now();
-    const { accountId, messageId, fullSync } = job.data;
+    const { accountId, messageId: _messageId, fullSync } = job.data; // messageId reserved for future single-message sync
 
     try {
       console.log(`[EmailSyncWorker] Processing job ${job.id} for account ${accountId}`);

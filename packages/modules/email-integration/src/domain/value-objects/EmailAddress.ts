@@ -1,5 +1,5 @@
-import { Result } from '@lifeOS/core/shared/result';
-import { ValidationError } from '@lifeOS/core/shared/errors';
+import { Result } from '@lifeos/core/shared/result';
+import { ValidationError } from '@lifeos/core/shared/errors';
 
 /**
  * EmailAddress Value Object

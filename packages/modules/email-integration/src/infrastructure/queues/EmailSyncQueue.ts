@@ -82,9 +82,6 @@ export class EmailSyncQueue {
         delay: 1000, // 1s, 2s, 4s
       },
 
-      // Timeout configuration
-      timeout: 60000, // 60 seconds
-
       // Remove completed jobs after 1 hour (keep for debugging)
       removeOnComplete: {
         age: 3600, // 1 hour
@@ -100,26 +97,15 @@ export class EmailSyncQueue {
 
   /**
    * Setup event listeners for monitoring
+   * Note: Active, completed, and failed events are available on QueueEvents, not Queue
    */
   private setupEventListeners(): void {
-    this.queue.on('error', (error) => {
+    this.queue.on('error', (error: Error) => {
       console.error('[EmailSyncQueue] Queue error:', error);
     });
 
     this.queue.on('waiting', (job) => {
       console.log(`[EmailSyncQueue] Job ${job.id} waiting`);
-    });
-
-    this.queue.on('active', (job) => {
-      console.log(`[EmailSyncQueue] Job ${job.id} started`);
-    });
-
-    this.queue.on('completed', (job) => {
-      console.log(`[EmailSyncQueue] Job ${job.id} completed`);
-    });
-
-    this.queue.on('failed', (job, error) => {
-      console.error(`[EmailSyncQueue] Job ${job?.id} failed:`, error);
     });
   }
 

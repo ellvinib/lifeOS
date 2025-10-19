@@ -1,10 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { IEmailRepository } from '../../domain/interfaces/IEmailRepository';
 import { Email } from '../../domain/entities/Email';
-import { Result } from '@lifeOS/core/shared/result/Result';
-import { BaseError } from '@lifeOS/core/shared/errors/BaseError';
-import { NotFoundError } from '@lifeOS/core/shared/errors/NotFoundError';
-import { DatabaseError } from '@lifeOS/core/shared/errors/DatabaseError';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError } from '@lifeos/core/shared/errors';
+import { NotFoundError } from '@lifeos/core/shared/errors';
+import { DatabaseError } from '@lifeos/core/shared/errors';
 import { EmailPrismaMapper } from '../mappers/EmailPrismaMapper';
 
 /**
@@ -42,7 +42,7 @@ export class EmailRepository implements IEmailRepository {
 
       return EmailPrismaMapper.toDomain(prismaEmail);
     } catch (error) {
-      return Result.fail(new DatabaseError('Failed to find email by ID', error, { id }));
+      return Result.fail(new DatabaseError('Failed to find email by ID', error as Error, { id }));
     }
   }
 
@@ -72,7 +72,7 @@ export class EmailRepository implements IEmailRepository {
       return EmailPrismaMapper.toDomain(prismaEmail);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to find email by provider message ID', error, {
+        new DatabaseError('Failed to find email by provider message ID', error as Error, {
           accountId,
           providerMessageId,
         })
@@ -112,7 +112,7 @@ export class EmailRepository implements IEmailRepository {
       return EmailPrismaMapper.toDomainList(prismaEmails);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to find emails by account', error, {
+        new DatabaseError('Failed to find emails by account', error as Error, {
           accountId,
           options,
         })
@@ -178,7 +178,7 @@ export class EmailRepository implements IEmailRepository {
       return EmailPrismaMapper.toDomainList(prismaEmails);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to search emails', error, { accountId, filters })
+        new DatabaseError('Failed to search emails', error as Error, { accountId, filters })
       );
     }
   }
@@ -201,15 +201,14 @@ export class EmailRepository implements IEmailRepository {
         return Result.fail(
           new DatabaseError(
             'Email already exists',
-            error,
-            { emailId: email.id },
-            'DUPLICATE_EMAIL'
+            error as Error,
+            { emailId: email.id, errorCode: 'DUPLICATE_EMAIL' }
           )
         );
       }
 
       return Result.fail(
-        new DatabaseError('Failed to create email', error, { emailId: email.id })
+        new DatabaseError('Failed to create email', error as Error, { emailId: email.id })
       );
     }
   }
@@ -245,7 +244,7 @@ export class EmailRepository implements IEmailRepository {
       return EmailPrismaMapper.toDomainList(createdEmails);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to batch create emails', error, {
+        new DatabaseError('Failed to batch create emails', error as Error, {
           count: emails.length,
         })
       );
@@ -274,7 +273,7 @@ export class EmailRepository implements IEmailRepository {
       }
 
       return Result.fail(
-        new DatabaseError('Failed to update email', error, { emailId: email.id })
+        new DatabaseError('Failed to update email', error as Error, { emailId: email.id })
       );
     }
   }
@@ -294,7 +293,7 @@ export class EmailRepository implements IEmailRepository {
         return Result.fail(new NotFoundError('Email', id));
       }
 
-      return Result.fail(new DatabaseError('Failed to delete email', error, { id }));
+      return Result.fail(new DatabaseError('Failed to delete email', error as Error, { id }));
     }
   }
 
@@ -310,7 +309,7 @@ export class EmailRepository implements IEmailRepository {
       return Result.ok(result.count);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to delete emails by account', error, { accountId })
+        new DatabaseError('Failed to delete emails by account', error as Error, { accountId })
       );
     }
   }
@@ -356,7 +355,7 @@ export class EmailRepository implements IEmailRepository {
       return Result.ok(count);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to count emails', error, { accountId, filters })
+        new DatabaseError('Failed to count emails', error as Error, { accountId, filters })
       );
     }
   }
@@ -379,7 +378,7 @@ export class EmailRepository implements IEmailRepository {
       return Result.ok(count > 0);
     } catch (error) {
       return Result.fail(
-        new DatabaseError('Failed to check if email exists', error, {
+        new DatabaseError('Failed to check if email exists', error as Error, {
           accountId,
           providerMessageId,
         })

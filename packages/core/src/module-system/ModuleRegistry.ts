@@ -1,247 +1,250 @@
-import type { IModule, ModuleInfo, ModuleState } from './IModule';
-import { ModuleState as State } from './IModule';
+import { IModule, ModuleMetadata } from './IModule';
+import { Result } from '../shared/result';
+import { BaseError, NotFoundError, ModuleError } from '../shared/errors';
 
 /**
- * Central registry for all loaded modules.
- * Implements the Registry pattern for managing module lifecycle.
+ * Module Registry
  *
- * Features:
- * - Module registration and discovery
- * - Dependency resolution
- * - State tracking
- * - Query capabilities
+ * Central registry for all loaded modules.
+ * Provides module discovery and lifecycle management.
+ *
+ * Design Principles:
+ * - Singleton pattern: One registry per application
+ * - Type-safe module registration
+ * - Supports module dependencies
+ * - Validates module metadata
  */
 export class ModuleRegistry {
-  private modules: Map<string, ModuleInfo> = new Map();
+  private static instance: ModuleRegistry | null = null;
+  private modules: Map<string, RegisteredModule> = new Map();
+
+  private constructor() {}
 
   /**
-   * Register a module in the registry.
-   *
-   * @param module - Module to register
-   * @throws Error if module with same name already registered
+   * Get singleton instance
    */
-  register(module: IModule): void {
-    const name = module.manifest.name;
+  public static getInstance(): ModuleRegistry {
+    if (!ModuleRegistry.instance) {
+      ModuleRegistry.instance = new ModuleRegistry();
+    }
+    return ModuleRegistry.instance;
+  }
 
-    if (this.modules.has(name)) {
-      throw new Error(`Module ${name} is already registered`);
+  /**
+   * Register a module
+   *
+   * @param module Module instance
+   * @param metadata Module metadata from module.json
+   * @returns Result with success/error
+   */
+  public register(
+    module: IModule,
+    metadata: ModuleMetadata
+  ): Result<void, BaseError> {
+    // Validate module name matches metadata
+    if (module.name !== metadata.name) {
+      return Result.fail(
+        new ModuleError(
+          `Module name mismatch: instance="${module.name}", metadata="${metadata.name}"`,
+          'MODULE_NAME_MISMATCH',
+          400
+        )
+      );
     }
 
-    this.modules.set(name, {
+    // Check if module already registered
+    if (this.modules.has(module.name)) {
+      return Result.fail(
+        new ModuleError(
+          `Module "${module.name}" is already registered`,
+          'MODULE_ALREADY_REGISTERED',
+          409
+        )
+      );
+    }
+
+    // Register module
+    this.modules.set(module.name, {
       module,
-      state: State.LOADED,
-      loadedAt: new Date(),
+      metadata,
+      state: 'registered',
+      registeredAt: new Date(),
     });
+
+    return Result.ok(undefined);
   }
 
   /**
-   * Unregister a module from the registry.
+   * Get module by name
    *
-   * @param name - Module name
-   * @returns True if module was unregistered
+   * @param name Module name
+   * @returns Module instance or error
    */
-  unregister(name: string): boolean {
-    return this.modules.delete(name);
+  public getModule(name: string): Result<IModule, BaseError> {
+    const registered = this.modules.get(name);
+    if (!registered) {
+      return Result.fail(
+        new NotFoundError('Module', name)
+      );
+    }
+
+    return Result.ok(registered.module);
   }
 
   /**
-   * Get a module by name.
+   * Get module metadata
    *
-   * @param name - Module name
-   * @returns Module or undefined
+   * @param name Module name
+   * @returns Module metadata or error
    */
-  get(name: string): IModule | undefined {
-    return this.modules.get(name)?.module;
+  public getMetadata(name: string): Result<ModuleMetadata, BaseError> {
+    const registered = this.modules.get(name);
+    if (!registered) {
+      return Result.fail(
+        new NotFoundError('Module', name)
+      );
+    }
+
+    return Result.ok(registered.metadata);
   }
 
   /**
-   * Get module info (including state).
+   * Get all registered modules
    *
-   * @param name - Module name
-   * @returns Module info or undefined
+   * @returns Array of all modules
    */
-  getInfo(name: string): ModuleInfo | undefined {
-    return this.modules.get(name);
+  public getAllModules(): IModule[] {
+    return Array.from(this.modules.values()).map((r) => r.module);
   }
 
   /**
-   * Check if a module is registered.
+   * Get all module metadata
    *
-   * @param name - Module name
+   * @returns Array of all module metadata
    */
-  has(name: string): boolean {
+  public getAllMetadata(): ModuleMetadata[] {
+    return Array.from(this.modules.values()).map((r) => r.metadata);
+  }
+
+  /**
+   * Check if module is registered
+   *
+   * @param name Module name
+   * @returns True if registered
+   */
+  public hasModule(name: string): boolean {
     return this.modules.has(name);
   }
 
   /**
-   * Get all registered modules.
-   */
-  getAll(): IModule[] {
-    return Array.from(this.modules.values()).map((info) => info.module);
-  }
-
-  /**
-   * Get all module names.
-   */
-  getAllNames(): string[] {
-    return Array.from(this.modules.keys());
-  }
-
-  /**
-   * Get modules by state.
+   * Update module state
    *
-   * @param state - Module state to filter by
+   * @param name Module name
+   * @param state New state
+   * @returns Result with success/error
    */
-  getByState(state: ModuleState): IModule[] {
+  public updateState(
+    name: string,
+    state: ModuleState
+  ): Result<void, BaseError> {
+    const registered = this.modules.get(name);
+    if (!registered) {
+      return Result.fail(
+        new NotFoundError('Module', name)
+      );
+    }
+
+    registered.state = state;
+    registered.updatedAt = new Date();
+
+    return Result.ok(undefined);
+  }
+
+  /**
+   * Get module state
+   *
+   * @param name Module name
+   * @returns Module state or error
+   */
+  public getState(name: string): Result<ModuleState, BaseError> {
+    const registered = this.modules.get(name);
+    if (!registered) {
+      return Result.fail(
+        new NotFoundError('Module', name)
+      );
+    }
+
+    return Result.ok(registered.state);
+  }
+
+  /**
+   * Get modules by state
+   *
+   * @param state Module state to filter by
+   * @returns Array of modules in that state
+   */
+  public getModulesByState(state: ModuleState): IModule[] {
     return Array.from(this.modules.values())
-      .filter((info) => info.state === state)
-      .map((info) => info.module);
+      .filter((r) => r.state === state)
+      .map((r) => r.module);
   }
 
   /**
-   * Update module state.
-   *
-   * @param name - Module name
-   * @param state - New state
-   * @param error - Optional error if state is ERROR
+   * Clear all modules (for testing)
    */
-  updateState(name: string, state: ModuleState, error?: Error): void {
-    const info = this.modules.get(name);
-    if (!info) {
-      throw new Error(`Module ${name} not found in registry`);
-    }
-
-    info.state = state;
-    if (error) {
-      info.error = error;
-    }
-    if (state === State.READY) {
-      info.initializedAt = new Date();
-    }
-
-    this.modules.set(name, info);
+  public clear(): void {
+    this.modules.clear();
   }
 
   /**
-   * Get module count.
+   * Get registry statistics
    */
-  count(): number {
-    return this.modules.size;
-  }
-
-  /**
-   * Check if all modules are in a given state.
-   *
-   * @param state - State to check
-   */
-  allInState(state: ModuleState): boolean {
-    return Array.from(this.modules.values()).every((info) => info.state === state);
-  }
-
-  /**
-   * Validate module dependencies are met.
-   *
-   * @param moduleName - Module to validate
-   * @returns Array of missing dependencies
-   */
-  validateDependencies(moduleName: string): string[] {
-    const module = this.get(moduleName);
-    if (!module) {
-      throw new Error(`Module ${moduleName} not found`);
-    }
-
-    const missing: string[] = [];
-    const deps = module.manifest.dependencies;
-
-    for (const [depName, depVersion] of Object.entries(deps)) {
-      const depModule = this.get(depName);
-      if (!depModule) {
-        missing.push(`${depName}@${depVersion}`);
-        continue;
-      }
-
-      // Simple version check (in production, use semver)
-      if (depModule.manifest.version !== depVersion) {
-        missing.push(`${depName}@${depVersion} (found ${depModule.manifest.version})`);
-      }
-    }
-
-    return missing;
-  }
-
-  /**
-   * Get initialization order based on dependencies.
-   * Uses topological sort to ensure dependencies are initialized first.
-   *
-   * @returns Array of module names in initialization order
-   * @throws Error if circular dependency detected
-   */
-  getInitializationOrder(): string[] {
-    const order: string[] = [];
-    const visited = new Set<string>();
-    const visiting = new Set<string>();
-
-    const visit = (name: string): void => {
-      if (visited.has(name)) return;
-      if (visiting.has(name)) {
-        throw new Error(`Circular dependency detected involving module: ${name}`);
-      }
-
-      visiting.add(name);
-
-      const module = this.get(name);
-      if (module) {
-        // Visit dependencies first
-        for (const depName of Object.keys(module.manifest.dependencies)) {
-          if (this.has(depName)) {
-            visit(depName);
-          }
-        }
-      }
-
-      visiting.delete(name);
-      visited.add(name);
-      order.push(name);
-    };
-
-    // Visit all modules
-    for (const name of this.modules.keys()) {
-      visit(name);
-    }
-
-    return order;
-  }
-
-  /**
-   * Get module statistics.
-   */
-  getStats(): {
-    total: number;
-    byState: Record<ModuleState, number>;
-    withErrors: number;
-  } {
-    const byState: Record<string, number> = {};
-    let withErrors = 0;
-
-    for (const info of this.modules.values()) {
-      byState[info.state] = (byState[info.state] ?? 0) + 1;
-      if (info.error) {
-        withErrors++;
-      }
-    }
+  public getStats(): RegistryStats {
+    const states = Array.from(this.modules.values()).reduce(
+      (acc, r) => {
+        acc[r.state] = (acc[r.state] || 0) + 1;
+        return acc;
+      },
+      {} as Record<ModuleState, number>
+    );
 
     return {
       total: this.modules.size,
-      byState: byState as Record<ModuleState, number>,
-      withErrors,
+      byState: states,
     };
   }
+}
 
-  /**
-   * Clear all modules from registry.
-   * WARNING: This is destructive and should only be used in tests!
-   */
-  clear(): void {
-    this.modules.clear();
-  }
+/**
+ * Registered Module
+ *
+ * Internal representation of a registered module
+ */
+interface RegisteredModule {
+  module: IModule;
+  metadata: ModuleMetadata;
+  state: ModuleState;
+  registeredAt: Date;
+  updatedAt?: Date;
+}
+
+/**
+ * Module State
+ *
+ * Tracks module lifecycle
+ */
+export type ModuleState =
+  | 'registered' // Module registered but not initialized
+  | 'initializing' // Module initialization in progress
+  | 'initialized' // Module initialized and ready
+  | 'error' // Module initialization failed
+  | 'shutting-down' // Module shutdown in progress
+  | 'shutdown'; // Module shut down
+
+/**
+ * Registry Statistics
+ */
+interface RegistryStats {
+  total: number;
+  byState: Record<ModuleState, number>;
 }

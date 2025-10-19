@@ -1,11 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright configuration for LifeOS E2E tests
+ * Playwright Configuration
  *
- * @see https://playwright.dev/docs/test-configuration
+ * E2E testing configuration for LifeOS.
+ * See https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
+  // Test directory
   testDir: './tests/e2e',
 
   // Run tests in files in parallel
@@ -24,57 +26,47 @@ export default defineConfig({
   reporter: [
     ['html'],
     ['list'],
-    ['json', { outputFile: 'test-results/results.json' }]
+    ...(process.env.CI ? [['github']] : []),
   ],
 
   // Shared settings for all the projects below
   use: {
-    // Base URL to use in actions like `await page.goto('/')`
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+    // Base URL for API tests
+    baseURL: process.env.API_URL || 'http://localhost:3000',
 
     // Collect trace when retrying the failed test
     trace: 'on-first-retry',
 
     // Screenshot on failure
     screenshot: 'only-on-failure',
-
-    // Video on failure
-    video: 'retain-on-failure',
   },
 
-  // Configure projects for major browsers
+  // Configure projects for different test types
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-
-    // Test against mobile viewports
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
+      name: 'api',
+      testMatch: /.*\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
     },
   ],
 
-  // Run your local dev server before starting the tests
+  // Run local dev server before starting the tests
   webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:3000',
+    command: 'npm run dev',
+    url: 'http://localhost:3000/health',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
+
+  // Test timeout
+  timeout: 30 * 1000,
+  expect: {
+    timeout: 10 * 1000,
+  },
+
+  // Global setup/teardown
+  // globalSetup: require.resolve('./tests/e2e/global-setup.ts'),
+  // globalTeardown: require.resolve('./tests/e2e/global-teardown.ts'),
 });

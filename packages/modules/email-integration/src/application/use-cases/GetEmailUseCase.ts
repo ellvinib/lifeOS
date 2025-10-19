@@ -1,10 +1,9 @@
 import { IEmailRepository } from '../../domain/interfaces/IEmailRepository';
 import { IEmailAccountRepository } from '../../domain/interfaces/IEmailAccountRepository';
 import { IEmailProvider, EmailContent } from '../../domain/interfaces/IEmailProvider';
-import { Result } from '@lifeOS/core/shared/result/Result';
-import { BaseError } from '@lifeOS/core/shared/errors/BaseError';
-import { NotFoundError } from '@lifeOS/core/shared/errors/NotFoundError';
-import { BusinessRuleError } from '@lifeOS/core/shared/errors/BusinessRuleError';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError } from '@lifeos/core/shared/errors';
+import { BusinessRuleError } from '@lifeos/core/shared/errors';
 
 /**
  * Cache Service Interface

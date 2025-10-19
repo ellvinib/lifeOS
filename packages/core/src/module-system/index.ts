@@ -1,6 +1,8 @@
 /**
  * Module System
- * Provides plugin architecture for extending LifeOS with new modules.
+ *
+ * Core module system for LifeOS.
+ * Enables plugin architecture with lifecycle management.
  */
 
 export * from './IModule';

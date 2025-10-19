@@ -1,29 +1,13 @@
 import { IEmailAccountRepository } from '../../domain/interfaces/IEmailAccountRepository';
 import { IEmailRepository } from '../../domain/interfaces/IEmailRepository';
-import { IEmailProvider } from '../../domain/interfaces/IEmailProvider';
+import { IEmailProvider, EmailMetadata } from '../../domain/interfaces/IEmailProvider';
 import { Email } from '../../domain/entities/Email';
 import { EmailAddress } from '../../domain/value-objects/EmailAddress';
-import { Result } from '@lifeOS/core/shared/result/Result';
-import { BaseError } from '@lifeOS/core/shared/errors/BaseError';
-import { NotFoundError } from '@lifeOS/core/shared/errors/NotFoundError';
-import { BusinessRuleError } from '@lifeOS/core/shared/errors/BusinessRuleError';
-import { IEventPublisher } from '@lifeOS/core/events/IEventPublisher';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError } from '@lifeos/core/shared/errors';
+import { BusinessRuleError } from '@lifeos/core/shared/errors';
+import { IEventPublisher, DomainEvent } from '@lifeos/core/events';
 import { v4 as uuidv4 } from 'uuid';
-
-/**
- * Email Metadata from Provider
- */
-export interface EmailMetadata {
-  providerMessageId: string;
-  from: string;
-  fromName?: string;
-  to: string[];
-  subject: string;
-  snippet: string;
-  hasAttachments: boolean;
-  timestamp: Date;
-  labels?: string[];
-}
 
 /**
  * Sync Emails Use Case
@@ -215,9 +199,12 @@ export class SyncEmailsUseCase {
    */
   private async publishEmailReceivedEvent(email: Email): Promise<void> {
     try {
-      await this.eventPublisher.publish({
+      const event: DomainEvent = {
+        id: uuidv4(),
         type: 'EmailReceived',
         source: 'email-integration',
+        timestamp: new Date(),
+        version: 1,
         payload: {
           emailId: email.id,
           accountId: email.accountId,
@@ -239,7 +226,9 @@ export class SyncEmailsUseCase {
         metadata: {
           syncedAt: new Date().toISOString(),
         },
-      });
+      };
+
+      await this.eventPublisher.publish(event);
     } catch (error) {
       // Log error but don't fail the sync
       console.error(`Failed to publish EmailReceived event: ${error}`);

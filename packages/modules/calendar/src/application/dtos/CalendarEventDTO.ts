@@ -112,6 +112,8 @@ export class CalendarEventDTOMapper {
    * Convert domain entity to response DTO
    */
   public static toResponseDTO(event: CalendarEvent): CalendarEventResponseDTO {
+    const metadata = event.metadata || {};
+
     return {
       id: event.id,
       userId: event.userId,
@@ -123,22 +125,22 @@ export class CalendarEventDTOMapper {
       startTime: event.startTime.toISOString(),
       endTime: event.endTime.toISOString(),
       isAllDay: event.isAllDay,
-      timeZone: event.timeZone,
+      timeZone: event.timezone,
       isFlexible: event.isFlexible,
       flexibilityScore: event.flexibilityScore.value,
       priority: event.priority,
       category: event.category,
       createdByModule: event.createdByModule,
       attendees: event.attendees,
-      organizerEmail: event.organizerEmail,
-      isRecurring: event.isRecurring,
-      recurrenceRule: event.recurrenceRule,
-      recurrenceExceptions: event.recurrenceExceptions.map((d) => d.toISOString()),
+      organizerEmail: metadata.organizerEmail,
+      isRecurring: metadata.isRecurring || false,
+      recurrenceRule: metadata.recurrenceRule,
+      recurrenceExceptions: metadata.recurrenceExceptions?.map((d: Date) => d.toISOString()) || [],
       syncStatus: event.syncStatus,
       lastSyncedAt: event.lastSyncedAt?.toISOString(),
-      syncError: event.syncError,
-      color: event.color,
-      tags: event.tags,
+      syncError: metadata.syncError,
+      color: metadata.color,
+      tags: metadata.tags || [],
       metadata: event.metadata,
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),

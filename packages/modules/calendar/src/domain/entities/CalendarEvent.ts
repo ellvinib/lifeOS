@@ -7,6 +7,7 @@
  * @module Calendar
  */
 
+import { randomUUID } from 'crypto';
 import { TimeSlot } from '../value-objects/TimeSlot';
 import { FlexibilityScore } from '../value-objects/FlexibilityScore';
 import { EventCategory, Priority, SyncStatus } from '../value-objects/CalendarEnums';
@@ -89,6 +90,63 @@ export class CalendarEvent {
     this._lastSyncedAt = props.lastSyncedAt;
     this._createdAt = props.createdAt;
     this._updatedAt = props.updatedAt;
+  }
+
+  /**
+   * Factory method to create a new CalendarEvent
+   */
+  static create(data: {
+    userId: string;
+    title: string;
+    description?: string;
+    location?: string;
+    startTime: Date;
+    endTime: Date;
+    timeZone?: string;
+    isAllDay?: boolean;
+    isFlexible?: boolean;
+    flexibilityScore?: FlexibilityScore;
+    priority: Priority;
+    category: EventCategory;
+    createdByModule: string;
+    attendees?: string[];
+    organizerEmail?: string;
+    isRecurring?: boolean;
+    recurrenceRule?: string;
+    color?: string;
+    tags?: string[];
+  }): CalendarEvent {
+    const now = new Date();
+
+    // Build metadata from optional fields
+    const metadata: Record<string, any> = {};
+    if (data.organizerEmail) metadata.organizerEmail = data.organizerEmail;
+    if (data.isRecurring) metadata.isRecurring = data.isRecurring;
+    if (data.recurrenceRule) metadata.recurrenceRule = data.recurrenceRule;
+    if (data.color) metadata.color = data.color;
+    if (data.tags && data.tags.length > 0) metadata.tags = data.tags;
+
+    return new CalendarEvent({
+      id: randomUUID(),
+      userId: data.userId,
+      title: data.title,
+      description: data.description,
+      location: data.location,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      timezone: data.timeZone || 'UTC',
+      isAllDay: data.isAllDay ?? false,
+      isFlexible: data.isFlexible ?? false,
+      flexibilityScore: data.flexibilityScore || FlexibilityScore.inflexible(),
+      priority: data.priority,
+      category: data.category,
+      createdByModule: data.createdByModule,
+      attendees: data.attendees || [],
+      metadata,
+      syncStatus: SyncStatus.IDLE,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
   // Getters

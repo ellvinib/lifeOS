@@ -1,6 +1,6 @@
 import { Client } from '@microsoft/microsoft-graph-client';
-import { Result } from '@lifeOS/core/shared/result';
-import { BaseError, ExternalServiceError } from '@lifeOS/core/shared/errors';
+import { Result } from '@lifeos/core/shared/result';
+import { BaseError, ExternalServiceError } from '@lifeos/core/shared/errors';
 import { IEmailConnectionManager } from '../../domain/interfaces/IEmailConnectionManager';
 import { EmailAccount } from '../../domain/entities/EmailAccount';
 import * as crypto from 'crypto';
