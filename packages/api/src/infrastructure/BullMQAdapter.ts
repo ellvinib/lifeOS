@@ -39,6 +39,20 @@ export class BullMQAdapter implements IJobQueue {
   }
 
   /**
+   * Initialize the job queue (test Redis connection)
+   */
+  async initialize(): Promise<void> {
+    try {
+      // Test Redis connection
+      await this.redis.ping();
+      console.log('  ✅ Job queue connected to Redis');
+    } catch (error) {
+      console.error('  ❌ Failed to connect to Redis:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Add job to queue
    */
   async add<T = any>(

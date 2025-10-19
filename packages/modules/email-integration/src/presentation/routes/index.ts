@@ -3,6 +3,7 @@ import { ModuleContext } from '@lifeos/core/module-system';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { WebhookController } from '../controllers/WebhookController';
 import { EmailAccountController } from '../controllers/EmailAccountController';
+import { OAuthController } from '../controllers/OAuthController';
 import { EmailAccountRepository } from '../../infrastructure/repositories/EmailAccountRepository';
 import { OutlookConnectionManager } from '../../infrastructure/connections/OutlookConnectionManager';
 import { GmailConnectionManager } from '../../infrastructure/connections/GmailConnectionManager';
@@ -84,6 +85,7 @@ export function routes(context: ModuleContext): Router {
     disconnectAccountUseCase,
     accountRepository
   );
+  const oauthController = new OAuthController();
 
   // ========================================
   // Webhook Routes (Public Endpoints)
@@ -103,6 +105,18 @@ export function routes(context: ModuleContext): Router {
    */
   router.post('/webhooks/gmail', (req, res, next) =>
     webhookController.handleGmailWebhook(req, res, next)
+  );
+
+  // ========================================
+  // OAuth Routes
+  // ========================================
+
+  /**
+   * Exchange OAuth authorization code for tokens
+   * POST /oauth/token
+   */
+  router.post('/oauth/token', (req, res, next) =>
+    oauthController.exchangeToken(req, res, next)
   );
 
   // ========================================

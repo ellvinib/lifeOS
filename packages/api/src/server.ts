@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import { PrismaClient } from '@prisma/client';
-import { ModuleLoader, ModuleContext } from '@lifeos/core/module-system';
+import { ModuleLoader, ModuleContext, ModuleRegistry } from '@lifeos/core/module-system';
 import { EventBus } from '@lifeos/core/events';
 import { BullMQAdapter } from './infrastructure/BullMQAdapter';
 import * as path from 'path';
@@ -49,19 +49,22 @@ export class LifeOSServer {
       // Step 2: Connect to database
       await this.connectDatabase();
 
-      // Step 3: Load and initialize modules
+      // Step 3: Initialize job queue
+      await this.jobQueue.initialize();
+
+      // Step 4: Load modules
       await this.loadModules();
 
-      // Step 4: Setup error handlers
-      this.setupErrorHandlers();
+      // Step 5: Setup error handling
+      this.setupErrorHandling();
 
-      // Step 5: Start HTTP server
+      // Step 6: Start HTTP server
       await this.startHttpServer();
 
-      // Step 6: Setup graceful shutdown
+      // Step 7: Setup graceful shutdown
       this.setupGracefulShutdown();
 
-      console.log('✅ LifeOS Server started successfully');
+      console.log('✅ LifeOS Server started successfully!\n');
     } catch (error) {
       console.error('❌ Failed to start server:', error);
       await this.shutdown();
@@ -73,11 +76,15 @@ export class LifeOSServer {
    * Setup Express middleware
    */
   private setupMiddleware(): void {
+    console.log('  ⚙️  Setting up middleware...');
+
     // Security
     this.app.use(helmet());
+
+    // CORS
     this.app.use(
       cors({
-        origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+        origin: process.env.CORS_ORIGIN || '*',
         credentials: true,
       })
     );
@@ -85,16 +92,16 @@ export class LifeOSServer {
     // Compression
     this.app.use(compression());
 
-    // Logging
-    if (process.env.NODE_ENV !== 'test') {
-      this.app.use(morgan('combined'));
-    }
-
     // Body parsing
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-    // Health check endpoint
+    // Logging
+    if (process.env.NODE_ENV !== 'test') {
+      this.app.use(morgan('dev'));
+    }
+
+    // Health check
     this.app.get('/health', (req: Request, res: Response) => {
       res.json({
         status: 'healthy',
@@ -103,102 +110,94 @@ export class LifeOSServer {
       });
     });
 
-    // API info endpoint
-    this.app.get('/api', (req: Request, res: Response) => {
-      res.json({
-        name: 'LifeOS API',
-        version: '1.0.0',
-        environment: process.env.NODE_ENV || 'development',
-      });
-    });
+    console.log('  ✅ Middleware configured');
   }
 
   /**
    * Connect to database
    */
   private async connectDatabase(): Promise<void> {
-    console.log('📦 Connecting to database...');
-    await this.prisma.$connect();
-    console.log('✅ Database connected');
+    console.log('  💾 Connecting to database...');
+    try {
+      await this.prisma.$connect();
+      // Test connection
+      await this.prisma.$queryRaw`SELECT 1`;
+      console.log('  ✅ Database connected');
+    } catch (error) {
+      console.error('  ❌ Database connection failed:', error);
+      throw error;
+    }
   }
 
   /**
-   * Load and initialize modules
+   * Load all modules
    */
   private async loadModules(): Promise<void> {
-    console.log('📚 Loading modules...');
+    console.log('  📚 Loading modules...');
 
     const modulesPath = path.join(__dirname, '../../modules');
+    console.log(`  📂 Modules directory: ${modulesPath}`);
 
+    // Create module context
     const context: ModuleContext = {
       prisma: this.prisma,
       eventBus: this.eventBus,
       jobQueue: this.jobQueue,
-      config: {
-        geminiApiKey: process.env.GEMINI_API_KEY,
-        mailgunSigningKey: process.env.MAILGUN_SIGNING_KEY,
-        mailgunApiKey: process.env.MAILGUN_API_KEY,
-        fileStoragePath: process.env.FILE_STORAGE_PATH || './data',
-      },
-      storagePath: process.env.FILE_STORAGE_PATH || './data',
-      env: (process.env.NODE_ENV as any) || 'development',
+      config: {},
     };
 
-    const result = await this.moduleLoader.loadAll(modulesPath, context);
+    try {
+      // Load all modules (discovery happens internally)
+      const result = await this.moduleLoader.loadAll(modulesPath, context);
 
-    if (result.isFail()) {
-      throw new Error(`Failed to load modules: ${result.error.message}`);
-    }
-
-    const loadedModules = result.value;
-    console.log(`✅ Loaded ${loadedModules.length} modules:`, loadedModules.join(', '));
-
-    // Mount module routes
-    this.mountModuleRoutes();
-  }
-
-  /**
-   * Mount routes from all loaded modules
-   */
-  private mountModuleRoutes(): void {
-    const registry = this.moduleLoader['registry']; // Access private registry
-    const modules = registry.getAllModules();
-
-    for (const module of modules) {
-      const router = module.getRoutes();
-      if (router) {
-        const basePath = `/api/${module.name}`;
-        this.app.use(basePath, router);
-        console.log(`  📍 Mounted routes: ${basePath}`);
+      if (result.isFail()) {
+        throw result.error;
       }
+
+      // Get module registry to access loaded modules
+      const registry = ModuleRegistry.getInstance();
+      const loadedModules = registry.getAllModules();
+
+      // Mount module routes
+      for (const moduleInstance of loadedModules) {
+        const routes = moduleInstance.getRoutes();
+        if (routes) {
+          this.app.use('/api', routes);
+          console.log(`    ✓ Mounted routes for module: ${moduleInstance.name}`);
+        }
+      }
+
+      console.log(`  ✅ Loaded ${loadedModules.length} module(s)`);
+    } catch (error) {
+      console.error('  ❌ Module loading failed:', error);
+      throw error;
     }
   }
 
   /**
-   * Setup error handlers
+   * Setup error handling
    */
-  private setupErrorHandlers(): void {
+  private setupErrorHandling(): void {
     // 404 handler
     this.app.use((req: Request, res: Response) => {
       res.status(404).json({
-        success: false,
         error: {
           message: 'Route not found',
-          code: 'ROUTE_NOT_FOUND',
-          path: req.path,
+          code: 'NOT_FOUND',
         },
       });
     });
 
     // Global error handler
-    this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-      console.error('Server error:', err);
+    this.app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+      console.error('❌ Unhandled error:', err);
 
-      res.status(500).json({
-        success: false,
+      const statusCode = err.statusCode || 500;
+
+      res.status(statusCode).json({
         error: {
-          message: process.env.NODE_ENV === 'production' 
-            ? 'Internal server error' 
+          message: process.env.NODE_ENV === 'production'
+            ? 'Internal server error'
             : err.message,
           code: 'INTERNAL_SERVER_ERROR',
         },
@@ -278,4 +277,13 @@ export class LifeOSServer {
   getApp(): Express {
     return this.app;
   }
+}
+
+// Start server if this file is run directly
+if (require.main === module) {
+  const server = new LifeOSServer();
+  server.start().catch((error) => {
+    console.error('Fatal error starting server:', error);
+    process.exit(1);
+  });
 }

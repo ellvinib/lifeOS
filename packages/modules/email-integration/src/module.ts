@@ -93,5 +93,5 @@ export class EmailIntegrationModule implements IModule {
   }
 }
 
-// Export module instance
-export default new EmailIntegrationModule();
+// Export module class as default
+export default EmailIntegrationModule;

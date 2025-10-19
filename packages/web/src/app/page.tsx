@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Leaf, Home, Calendar, DollarSign, LogIn, UserPlus } from 'lucide-react';
-import { useAuth } from '@/lib/auth/AuthContext';
+import { useAuth } from '../lib/auth/AuthContext';
 
 export default function HomePage() {
   const { isAuthenticated, user, isLoading } = useAuth();

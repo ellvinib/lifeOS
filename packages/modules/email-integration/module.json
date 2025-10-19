@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Email account integration and synchronization for Gmail, Outlook, and SMTP",
   "author": "LifeOS",
-  "main": "dist/module.js",
+  "main": "src/module.ts",
   "permissions": [
     "database.read",
     "database.write",
